@@ -617,7 +617,7 @@ export class TypeResolver {
   /**
    * Resolve a mapped type: { [K in keyof T]: ... }
    */
-  private resolveMappedType(_node: TsMorphTypeNode): TypeNode {
+  private resolveMappedType(node: TsMorphTypeNode): TypeNode {
     return { kind: TypeKind.Object, properties: [] };
   }
 

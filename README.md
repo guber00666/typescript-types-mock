@@ -1,5 +1,9 @@
 # typescript-types-mock
 
+[![npm version](https://img.shields.io/npm/v/typescript-types-mock.svg)](https://www.npmjs.com/package/typescript-types-mock)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![TypeScript](https://img.shields.io/badge/TypeScript-7.0-blue.svg)](https://www.typescriptlang.org/)
+
 > Generate mock objects from TypeScript type definitions at runtime using ts-morph.
 
 ## Installation

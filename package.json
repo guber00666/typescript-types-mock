@@ -41,11 +41,11 @@
     "test-data",
     "fixtures"
   ],
-  "author": "",
+  "author": "fess00666",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": ""
+    "url": "https://github.com/guber00666/typescript-types-mock.git"
   },
   "peerDependencies": {
     "typescript": ">=5.0.0"
