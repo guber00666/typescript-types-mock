@@ -1,0 +1,65 @@
+{
+  "name": "typescript-types-mock",
+  "version": "0.1.0",
+  "description": "Generate mock objects from TypeScript types at runtime using ts-morph",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "rslib build",
+    "dev": "rslib build --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "typescript",
+    "mock",
+    "testing",
+    "codegen",
+    "ts-morph",
+    "faker",
+    "test-data",
+    "fixtures"
+  ],
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": ""
+  },
+  "peerDependencies": {
+    "typescript": ">=5.0.0"
+  },
+  "dependencies": {
+    "ts-morph": "^25.0.0"
+  },
+  "devDependencies": {
+    "@microsoft/api-extractor": "^7.59.0",
+    "@rslib/core": "^0.23.2",
+    "@types/node": "^26.4.0",
+    "@vitest/coverage-v8": "^3.0.0",
+    "oxlint": "^0.16.0",
+    "typescript": "^7.0.0",
+    "vitest": "^3.0.0"
+  }
+}
