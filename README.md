@@ -2,96 +2,124 @@
 
 [![npm version](https://img.shields.io/npm/v/typescript-types-mock.svg)](https://www.npmjs.com/package/typescript-types-mock)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![TypeScript](https://img.shields.io/badge/TypeScript-7.0-blue.svg)](https://www.typescriptlang.org/)
 
-> Generate mock objects from TypeScript type definitions at runtime using ts-morph.
+> Generate mock objects from TypeScript types for **Playwright** testing. Resolves types across local modules and npm packages.
 
 ## Installation
 
 ```bash
-npm install typescript-types-mock
+npm install -D typescript-types-mock ts-morph typescript
 ```
 
-**Peer dependencies:** `typescript` (>=5.0.0)
-
-## Quick Start
-
-Given a file `types.ts`:
+## Quick Start — Playwright
 
 ```typescript
-export interface User {
-  name: string;
-  age: number;
-  isActive: boolean;
-  email: string;
-}
+// e2e/example.spec.ts
+import { test, expect } from "@playwright/test";
+import {
+  createMockFromFile,
+  createRouteResponse,
+  createApiResponse,
+} from "typescript-types-mock";
+import path from "path";
 
-export type Status = "active" | "inactive" | "pending";
+const TYPES = path.resolve(__dirname, "../src/types.ts");
 
-export enum Color {
-  Red = "RED",
-  Green = "GREEN",
-  Blue = "BLUE",
-}
-```
+test("user profile page renders mocked data", async ({ page }) => {
+  const user = createMockFromFile(TYPES, "User");
 
-Generate mocks:
+  await page.route("**/api/user", (route) => {
+    route.fulfill(createRouteResponse(user));
+  });
 
-```typescript
-import { createMockFromFile } from "typescript-types-mock";
-
-const user = createMockFromFile("./types.ts", "User");
-// => { name: "Lorem ipsum", age: 423, isActive: true, email: "Hello World" }
-
-const status = createMockFromFile("./types.ts", "Status");
-// => "active" (randomly picks one of the union members)
-
-const color = createMockFromFile("./types.ts", "Color");
-// => "RED" (randomly picks one of the enum members)
+  await page.goto("/profile");
+  await expect(page.getByText(user.name as string)).toBeVisible();
+});
 ```
 
 ## API
 
 ### `createMockFromFile(filePath, typeName, options?)`
 
-Creates a single mock object from a TypeScript type definition in a file.
-
 ```typescript
-import { createMockFromFile } from "typescript-types-mock";
-
-const user = createMockFromFile("./src/types.ts", "User", {
-  overrides: { name: "John Doe" },
-  generators: { string: () => "custom-value" },
-});
+const user = createMockFromFile("./types.ts", "User", { seed: 42 });
+// => { name: "Alice Smith", age: 25, email: "alice@example.com", ... }
 ```
 
 ### `createManyMocks(filePath, typeName, count, options?)`
 
-Creates multiple mock objects.
-
 ```typescript
-import { createManyMocks } from "typescript-types-mock";
-
-const users = createManyMocks("./types.ts", "User", 10);
-// => Array of 10 mock User objects
+const users = createManyMocks("./types.ts", "User", 5);
+// => [{ name: "Alice Smith", ... }, { name: "Bob Johnson", ... }, ...]
 ```
 
 ### `listTypes(filePath)`
 
-Lists all available types in a TypeScript file.
+```typescript
+const types = listTypes("./types.ts");
+// => ["User", "Admin", "Product", ...]
+```
+
+### `MockContext` — caching for performance
+
+Parse once, reuse resolved types across multiple calls.
 
 ```typescript
-import { listTypes } from "typescript-types-mock";
+import { createMockContext } from "typescript-types-mock";
 
-const types = listTypes("./types.ts");
-// => ["User", "Status", "Color", "Address", ...]
+const ctx = createMockContext("./types.ts");
+const user = ctx.mock("User");       // single mock
+const users = ctx.many("User", 10);  // array of mocks
+const types = ctx.listTypes();       // ["User", "Admin", ...]
+```
+
+## Playwright Helpers
+
+### `createRouteResponse(body, options?)`
+
+Create a Playwright-compatible `route.fulfill()` response:
+
+```typescript
+const user = createMockFromFile("./types.ts", "User");
+const response = createRouteResponse(user);
+// => { status: 200, contentType: "application/json", headers: {...}, body: "..." }
+
+await page.route("**/api/user", (route) => {
+  route.fulfill(response);
+});
+
+// Custom status:
+route.fulfill(createRouteResponse(user, { status: 201 }));
+```
+
+### `createApiResponse(data, options?)`
+
+Wrap data in a standard API response envelope:
+
+```typescript
+const envelope = createApiResponse(user);
+// => { data: user, error: null, status: 200, timestamp: "..." }
+
+// Error response:
+createApiResponse(null, { status: 404, error: "Not found" });
+```
+
+### `createPaginatedResponse(items, options?)`
+
+Paginated response with metadata:
+
+```typescript
+const items = createManyMocks("./types.ts", "Product", 10);
+const page = createPaginatedResponse(items, { page: 1, pageSize: 10, total: 50 });
+// => { data: [...], meta: { page: 1, pageSize: 10, total: 50, totalPages: 5 }, ... }
 ```
 
 ## Options
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `overrides` | `Record<string, unknown>` | `{}` | Override specific property values |
+| `seed` | `number` | — | Deterministic generation (same seed = same output) |
+| `overrides` | `Record<string, unknown>` | `{}` | Override property values (supports nested merge) |
 | `generators.string` | `() => string` | random | Custom string generator |
 | `generators.number` | `() => number` | random | Custom number generator |
 | `generators.boolean` | `() => boolean` | random | Custom boolean generator |
@@ -102,246 +130,105 @@ const types = listTypes("./types.ts");
 
 ## Supported Types
 
-### Primitives
-- `string`, `number`, `boolean`, `bigint`, `symbol`
-- `null`, `undefined`, `void`
-- `any`, `unknown`
-
-### Literal Types
-- String literals: `"hello"`
-- Number literals: `42`
-- Boolean literals: `true`, `false`
-
-### Composite Types
-- **Interfaces**: `interface User { name: string }`
-- **Type aliases**: `type Status = "active" | "inactive"`
+- **Primitives**: `string`, `number`, `boolean`, `bigint`, `null`, `undefined`
+- **Literals**: `"hello"`, `42`, `true`
 - **Enums**: `enum Color { Red = "RED" }`
-- **Classes**: `class Vehicle { make: string }`
-
-### Complex Types
-- **Arrays**: `string[]`, `Array<User>`
-- **Tuples**: `[string, number]`
-- **Unions**: `string | number`
+- **Unions**: `"active" | "inactive"`
 - **Intersections**: `User & Timestamped`
-- **Optional properties**: `bio?: string`
+- **Arrays/Tuples**: `string[]`, `[number, string]`
+- **Utility Types**: `Record<K,V>`, `Partial<T>`, `Required<T>`, `Pick<T,K>`, `Omit<T,K>`
+- **Built-ins**: `Date`, `RegExp`, `Map<K,V>`, `Set<T>`, `Promise<T>`
+- **Classes, Interfaces, Generics**
 
-### Utility Types
-- `Record<K, V>`
-- `Partial<T>`
-- `Required<T>`
-- `Pick<T, K>`
-- `Omit<T, K>`
+## Cross-Module Resolution
 
-### Built-in Types
-- `Date`, `RegExp`, `Map<K, V>`, `Set<T>`
-- `Promise<T>`
-- Functions (returns no-op stub)
-
-## Examples
-
-### With Overrides
+Types are resolved across imports automatically:
 
 ```typescript
-const user = createMockFromFile("./types.ts", "User", {
+// types/models.ts
+export interface User { name: string; email: string; role: Role; }
+
+// types/enums.ts
+export type Role = "admin" | "user";
+
+// types/index.ts
+export { User } from "./models";
+export { Role } from "./enums";
+
+// In your Playwright test:
+const user = createMockFromFile("./types/index.ts", "User");
+// => role is correctly resolved as "admin" or "user"
+```
+
+### npm Package Types
+
+Types from installed packages are resolved from `.d.ts` files:
+
+```typescript
+// consumer.ts
+import { AxiosResponse } from "axios";
+interface MyData { response: AxiosResponse; }
+
+const data = createMockFromFile("./consumer.ts", "MyData");
+```
+
+## Playwright Patterns
+
+### Mocking multiple endpoints
+
+```typescript
+import { test } from "@playwright/test";
+import { createMockContext, createRouteResponse } from "typescript-types-mock";
+
+test("dashboard loads", async ({ page }) => {
+  const ctx = createMockContext("./types.ts");
+
+  await page.route("**/api/user", (route) =>
+    route.fulfill(createRouteResponse(ctx.mock("User")))
+  );
+  await page.route("**/api/products", (route) =>
+    route.fulfill(createRouteResponse(ctx.many("Product", 5)))
+  );
+
+  await page.goto("/dashboard");
+});
+```
+
+### Error scenarios
+
+```typescript
+await page.route("**/api/user/999", (route) => {
+  route.fulfill(createRouteResponse(
+    createApiResponse(null, { status: 404, error: "Not found" }),
+    { status: 404 }
+  ));
+});
+```
+
+### Overrides with nested merge
+
+```typescript
+const order = createMockFromFile("./types.ts", "Order", {
   overrides: {
-    name: "Alice",
-    age: 30,
+    id: "ORD-001",
+    shippingAddress: { city: "Moscow" }, // merges, other fields generated
   },
 });
-// => { name: "Alice", age: 30, isActive: true, email: "Lorem ipsum" }
 ```
 
-### With Custom Generators
+### Deterministic tests
 
 ```typescript
-let counter = 0;
-const user = createMockFromFile("./types.ts", "User", {
-  generators: {
-    string: () => `user-${++counter}`,
-    number: () => 42,
-    boolean: () => true,
-  },
-});
-// => { name: "user-1", age: 42, isActive: true, email: "user-2" }
-```
-
-### Nested Interfaces
-
-```typescript
-// types.ts
-interface Address { street: string; city: string; }
-interface Company { name: string; address: Address; }
-
-const company = createMockFromFile("./types.ts", "Company");
-// => {
-//   name: "Lorem ipsum",
-//   address: { street: "Foo Bar", city: "Test Value" }
-// }
-```
-
-### Inheritance
-
-```typescript
-// types.ts
-interface User { name: string; age: number; }
-interface Admin extends User { role: string; permissions: string[]; }
-
-const admin = createMockFromFile("./types.ts", "Admin");
-// => { name: "Lorem ipsum", age: 42, role: "Hello World", permissions: ["Foo Bar", "Test Value"] }
-```
-
-### Exclude Optional Properties
-
-```typescript
-const profile = createMockFromFile("./types.ts", "Profile", {
-  includeOptional: false,
-});
-// Optional properties (bio?, avatar?) will not be included
-```
-
-### Generate Arrays of Mocks
-
-```typescript
-const users = createManyMocks("./types.ts", "User", 5, {
-  arrayLength: 3,
-  generators: { number: () => Math.floor(Math.random() * 100) },
-});
-// => Array of 5 User objects
-```
-
-## Browser Usage
-
-The package works in browser environments via a pre-built JSON schema generated at build time.
-
-### Step 1: Generate schema at build time
-
-Use the CLI tool to extract type information into a JSON file:
-
-```bash
-npx typescript-types-mock generate ./src/types.ts -o ./src/types.schema.json
-```
-
-Or add it to your build script:
-
-```json
-{
-  "scripts": {
-    "build:schema": "typescript-types-mock generate ./src/types.ts -o ./public/types.schema.json --pretty"
-  }
-}
-```
-
-### Step 2: Import and use in browser code
-
-```typescript
-import schema from "./types.schema.json";
-import { createMockContext } from "typescript-types-mock/browser";
-
-const ctx = createMockContext(schema, { seed: 42 });
-const user = ctx.mock("User");
-const users = ctx.many("User", 10);
-```
-
-Or use the lower-level API:
-
-```typescript
-import schema from "./types.schema.json";
-import { createMockFromSchema } from "typescript-types-mock/browser";
-
-const user = createMockFromSchema(schema, "User", {
-  overrides: { name: "Alice" },
-});
-```
-
-### Browser API
-
-The `/browser` entry point exports browser-safe functions:
-
-- `createMockContext(schema, options?)` — caching context for fast repeated calls
-- `createMockFromSchema(schema, typeName, options?)` — create a single mock
-- `createManyMocksFromSchema(schema, typeName, count, options?)` — create multiple mocks
-- `listTypesFromSchema(schema)` — list all available type names
-- `BrowserTypeResolver` — low-level resolver wrapper
-- `MockContextBase` — base class for custom contexts
-- `RandomGenerator` — random value generator
-- `createRouteResponse`, `createApiResponse`, `createPaginatedResponse` — Playwright helpers
-
-## Playwright Integration
-
-In Playwright tests (Node.js environment), use the main API directly:
-
-```typescript
-import { createMockFromFile, createRouteResponse } from "typescript-types-mock";
-import { test, expect } from "@playwright/test";
-
-test("mock API response", async ({ page }) => {
-  await page.route("**/api/users", (route) => {
-    const user = createMockFromFile("./types.ts", "User");
-    route.fulfill(createRouteResponse(user));
-  });
-
-  await page.goto("/users");
-  // Your test assertions...
-});
-```
-
-With custom status and headers:
-
-```typescript
-await page.route("**/api/users", (route) => {
-  const user = createMockFromFile("./types.ts", "User", {
-    overrides: { role: "admin" },
-  });
-  route.fulfill(createRouteResponse(user, { status: 201 }));
-});
-```
-
-API response wrapper:
-
-```typescript
-await page.route("**/api/users", (route) => {
-  const user = createMockFromFile("./types.ts", "User");
-  const response = createApiResponse(user);
-  route.fulfill(createRouteResponse(response));
-});
-```
-
-## CLI Reference
-
-### `typescript-types-mock generate`
-
-Generate a JSON type schema from a TypeScript file for browser usage.
-
-**Usage:**
-```bash
-typescript-types-mock generate <input.ts> [options]
-```
-
-**Options:**
-- `-o, --output <file>` — Output file path (default: `<input>.schema.json`)
-- `--pretty` — Pretty-print JSON output (default: minified)
-- `-h, --help` — Show help message
-
-**Examples:**
-```bash
-# Generate schema with default output name
-typescript-types-mock generate ./src/types.ts
-# → creates ./src/types.schema.json
-
-# Specify output path
-typescript-types-mock generate ./src/types.ts -o ./public/types.schema.json
-
-# Pretty-print for debugging
-typescript-types-mock generate ./src/types.ts --pretty
+const user = createMockFromFile("./types.ts", "User", { seed: 42 });
+// Same seed → same output → stable assertions
 ```
 
 ## How It Works
 
-1. **Parsing**: Uses [ts-morph](https://ts-morph.com/) (TypeScript Compiler API wrapper) to parse `.ts` source files and extract type information (interfaces, type aliases, enums, classes).
-
-2. **Type Resolution**: Converts TypeScript AST nodes into an internal type representation (`TypeNode`), handling nested types, imports, generics, and utility types.
-
-3. **Mock Generation**: Traverses the resolved type tree and generates realistic random values for each type node, with configurable generators, overrides, and depth limits.
+1. **Parsing**: Uses [ts-morph](https://ts-morph.com/) to parse `.ts` files and extract type information.
+2. **Dependency Resolution**: Follows `import`/`export` chains across local modules, re-exports, and npm packages.
+3. **Type Resolution**: Converts TypeScript AST into an internal `TypeNode` representation.
+4. **Mock Generation**: Generates realistic random values with configurable generators, overrides, and depth limits.
 
 ## License
 

@@ -1,15 +1,15 @@
 /**
  * typescript-types-mock
  *
- * Generate mock objects from TypeScript type definitions at runtime.
- * Uses ts-morph to parse .ts files and create realistic mock data.
+ * Generate mock objects from TypeScript type definitions for Playwright testing.
+ * Uses ts-morph to parse .ts files and create realistic mock data with
+ * Playwright-specific route response helpers.
  */
 
 export { TypeResolver } from "./core/type-resolver.js";
-export { BrowserTypeResolver } from "./core/browser-type-resolver.js";
 export type { ITypeResolver } from "./core/type-resolver-interface.js";
 export { MockGenerator } from "./core/mock-generator.js";
-export { MockContext, MockContextBase, createMockContext } from "./core/mock-context.js";
+export { MockContext, createMockContext } from "./core/mock-context.js";
 export type {
     MockOptions,
     TypeNode,

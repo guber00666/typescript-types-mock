@@ -31,6 +31,9 @@ export class TypeResolver implements ITypeResolver {
   private sourceFile: SourceFile;
   private resolving: Set<string> = new Set();
 
+  /** Set of absolute file paths loaded as dependencies */
+  private loadedFiles: Set<string> = new Set();
+
   /** The resolved absolute path of the source file */
   public readonly filePath: string;
 
@@ -73,6 +76,60 @@ export class TypeResolver implements ITypeResolver {
           }
     );
     this.sourceFile = this.project.addSourceFileAtPath(absolutePath);
+    this.loadedFiles.add(absolutePath);
+
+    // Recursively load all imported dependencies (local + npm)
+    this.loadDependencies(this.sourceFile);
+  }
+
+  /**
+   * Recursively load all files reachable via import/export declarations
+   * from the given source file. Handles both relative imports and npm packages.
+   * Uses a visited set to avoid infinite loops on circular dependencies.
+   */
+  private loadDependencies(sourceFile: SourceFile): void {
+    const filePath = sourceFile.getFilePath();
+    if (this.loadedFiles.has(filePath)) {
+      // Already processed — mark visited only, don't re-traverse
+    } else {
+      this.loadedFiles.add(filePath);
+    }
+
+    // Process import declarations: import { X } from './models' or 'some-pkg'
+    for (const imp of sourceFile.getImportDeclarations()) {
+      const resolved = imp.getModuleSpecifierSourceFile();
+      if (resolved) {
+        const resolvedPath = resolved.getFilePath();
+        if (!this.loadedFiles.has(resolvedPath)) {
+          let loaded: SourceFile;
+          try {
+            loaded = this.project.addSourceFileAtPath(resolvedPath);
+          } catch {
+            loaded = resolved;
+          }
+          this.loadedFiles.add(resolvedPath);
+          this.loadDependencies(loaded);
+        }
+      }
+    }
+
+    // Process export declarations: export { X } from './models' or export * from '...'
+    for (const exp of sourceFile.getExportDeclarations()) {
+      const resolved = exp.getModuleSpecifierSourceFile();
+      if (resolved) {
+        const resolvedPath = resolved.getFilePath();
+        if (!this.loadedFiles.has(resolvedPath)) {
+          let loaded: SourceFile;
+          try {
+            loaded = this.project.addSourceFileAtPath(resolvedPath);
+          } catch {
+            loaded = resolved;
+          }
+          this.loadedFiles.add(resolvedPath);
+          this.loadDependencies(loaded);
+        }
+      }
+    }
   }
 
   /**
@@ -95,31 +152,80 @@ export class TypeResolver implements ITypeResolver {
   }
 
   /**
-   * Resolve all exported types from the source file.
+   * Get all source files to scan for types.
+   * The entry file is processed last so its types take priority over
+   * dependencies in case of name collisions.
+   */
+  private getAllSourceFiles(): SourceFile[] {
+    const mainPath = this.sourceFile.getFilePath();
+    const files: SourceFile[] = [];
+
+    for (const sf of this.project.getSourceFiles()) {
+      if (sf.getFilePath() !== mainPath) {
+        files.push(sf);
+      }
+    }
+    // Entry file last so its types override dependency types on collision
+    files.push(this.sourceFile);
+    return files;
+  }
+
+  /**
+   * Resolve all exported types from the source file and its dependencies.
+   * Types from the entry file take priority over dependency types.
    */
   resolveAllTypes(): ResolvedTypes {
     const types: ResolvedTypes = {};
 
-    // Interfaces
-    for (const iface of this.sourceFile.getInterfaces()) {
-      types[iface.getName()] = this.resolveInterface(iface);
+    for (const sf of this.getAllSourceFiles()) {
+      // Interfaces
+      for (const iface of sf.getInterfaces()) {
+        const name = iface.getName();
+        // Only add if not already defined by the entry file
+        if (!(name in types)) {
+          types[name] = this.resolveInterface(iface);
+        }
+      }
+
+      // Type aliases
+      for (const alias of sf.getTypeAliases()) {
+        const name = alias.getName();
+        if (!(name in types)) {
+          types[name] = this.resolveTypeAlias(alias);
+        }
+      }
+
+      // Enums
+      for (const enumDecl of sf.getEnums()) {
+        const name = enumDecl.getName();
+        if (!(name in types)) {
+          types[name] = this.resolveEnum(enumDecl);
+        }
+      }
+
+      // Classes
+      for (const cls of sf.getClasses()) {
+        const name = cls.getName();
+        if (name && !(name in types)) {
+          types[name] = this.resolveClass(cls);
+        }
+      }
     }
 
-    // Type aliases
-    for (const alias of this.sourceFile.getTypeAliases()) {
-      types[alias.getName()] = this.resolveTypeAlias(alias);
-    }
-
-    // Enums
-    for (const enumDecl of this.sourceFile.getEnums()) {
-      types[enumDecl.getName()] = this.resolveEnum(enumDecl);
-    }
-
-    // Classes
-    for (const cls of this.sourceFile.getClasses()) {
-      const name = cls.getName();
-      if (name) {
-        types[name] = this.resolveClass(cls);
+    // Handle import aliases: import { Foo as Bar } from '...'
+    // For each alias, create an entry pointing to the original type
+    for (const sf of this.getAllSourceFiles()) {
+      for (const imp of sf.getImportDeclarations()) {
+        for (const specifier of imp.getNamedImports()) {
+          const aliasNode = specifier.getAliasNode();
+          if (aliasNode) {
+            const aliasName = aliasNode.getText();
+            const originalName = specifier.getName();
+            if (!(aliasName in types) && originalName in types) {
+              types[aliasName] = types[originalName];
+            }
+          }
+        }
       }
     }
 
@@ -127,23 +233,52 @@ export class TypeResolver implements ITypeResolver {
   }
 
   /**
-   * Resolve a single type by name.
+   * Resolve a single type by name across all loaded source files.
+   * Searches the entry file first, then dependencies.
+   * Also handles import aliases (import { Foo as Bar }).
    */
   resolveType(typeName: string): TypeNode | undefined {
-    // Try interface
-    const iface = this.sourceFile.getInterface(typeName);
+    // Search entry file first
+    const entryResult = this.resolveTypeInFile(typeName, this.sourceFile);
+    if (entryResult) return entryResult;
+
+    // Then search dependencies
+    for (const sf of this.project.getSourceFiles()) {
+      if (sf.getFilePath() === this.sourceFile.getFilePath()) continue;
+      const result = this.resolveTypeInFile(typeName, sf);
+      if (result) return result;
+    }
+
+    // Check import aliases: import { Foo as Bar } → if typeName is "Bar", resolve "Foo"
+    for (const sf of this.project.getSourceFiles()) {
+      for (const imp of sf.getImportDeclarations()) {
+        for (const specifier of imp.getNamedImports()) {
+          const aliasNode = specifier.getAliasNode();
+          if (aliasNode && aliasNode.getText() === typeName) {
+            const originalName = specifier.getName();
+            return this.resolveType(originalName);
+          }
+        }
+      }
+    }
+
+    return undefined;
+  }
+
+  /**
+   * Try to resolve a type by name within a single source file.
+   */
+  private resolveTypeInFile(typeName: string, sf: SourceFile): TypeNode | undefined {
+    const iface = sf.getInterface(typeName);
     if (iface) return this.resolveInterface(iface);
 
-    // Try type alias
-    const alias = this.sourceFile.getTypeAlias(typeName);
+    const alias = sf.getTypeAlias(typeName);
     if (alias) return this.resolveTypeAlias(alias);
 
-    // Try enum
-    const enumDecl = this.sourceFile.getEnum(typeName);
+    const enumDecl = sf.getEnum(typeName);
     if (enumDecl) return this.resolveEnum(enumDecl);
 
-    // Try class
-    const cls = this.sourceFile.getClass(typeName);
+    const cls = sf.getClass(typeName);
     if (cls) return this.resolveClass(cls);
 
     return undefined;

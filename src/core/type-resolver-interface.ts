@@ -1,9 +1,8 @@
 /**
  * Abstract interface for type resolution.
  *
- * Two implementations exist:
- * - `TypeResolver` (Node.js) — parses .ts files using ts-morph at runtime
- * - `BrowserTypeResolver` (Browser) — uses pre-built JSON schema
+ * The main implementation is `TypeResolver` which parses .ts files
+ * using ts-morph at runtime, including cross-module and npm package types.
  */
 
 import type { ResolvedTypes, TypeNode } from "../types/index.js";
@@ -15,6 +14,6 @@ export interface ITypeResolver {
   /** Resolve a single type by name. Returns undefined if not found. */
   resolveType(typeName: string): TypeNode | undefined;
 
-  /** The resolved file path (may be virtual in browser). */
+  /** The resolved file path. */
   readonly filePath: string;
 }
