@@ -7,13 +7,28 @@
 
 export { TypeResolver } from "./core/type-resolver.js";
 export { MockGenerator } from "./core/mock-generator.js";
+export { MockContext, createMockContext } from "./core/mock-context.js";
 export type {
-  MockOptions,
-  TypeNode,
-  TypeKind,
-  PropertyNode,
-  ResolvedTypes,
+    MockOptions,
+    TypeNode,
+    TypeKind,
+    PropertyNode,
+    ResolvedTypes,
 } from "./types/index.js";
+
+// Playwright helpers
+export {
+    createRouteResponse,
+    createApiResponse,
+    createPaginatedResponse,
+} from "./helpers/playwright.js";
+export type {
+    RouteResponseOptions,
+    ApiResponseOptions,
+} from "./helpers/playwright.js";
+
+// Utilities
+export { RandomGenerator } from "./utils/random.js";
 
 import { TypeResolver } from "./core/type-resolver.js";
 import { MockGenerator } from "./core/mock-generator.js";
@@ -37,26 +52,26 @@ import type { MockOptions } from "./types/index.js";
  * ```
  */
 export function createMockFromFile(
-  filePath: string,
-  typeName: string,
-  options: Omit<MockOptions, "filePath"> = {}
+    filePath: string,
+    typeName: string,
+    options: Omit<MockOptions, "filePath"> = {},
 ): unknown {
-  const resolver = new TypeResolver(filePath);
-  const resolvedTypes = resolver.resolveAllTypes();
+    const resolver = new TypeResolver(filePath);
+    const resolvedTypes = resolver.resolveAllTypes();
 
-  if (!resolvedTypes[typeName]) {
-    throw new Error(
-      `Type "${typeName}" not found in file "${filePath}". ` +
-        `Available types: ${Object.keys(resolvedTypes).join(", ")}`
-    );
-  }
+    if (!resolvedTypes[typeName]) {
+        throw new Error(
+            `Type "${typeName}" not found in file "${filePath}". ` +
+                `Available types: ${Object.keys(resolvedTypes).join(", ")}`,
+        );
+    }
 
-  const generator = new MockGenerator(resolvedTypes, {
-    ...options,
-    filePath,
-  });
+    const generator = new MockGenerator(resolvedTypes, {
+        ...options,
+        filePath,
+    });
 
-  return generator.generate(typeName);
+    return generator.generate(typeName);
 }
 
 /**
@@ -75,27 +90,27 @@ export function createMockFromFile(
  * ```
  */
 export function createManyMocks(
-  filePath: string,
-  typeName: string,
-  count: number,
-  options: Omit<MockOptions, "filePath"> = {}
+    filePath: string,
+    typeName: string,
+    count: number,
+    options: Omit<MockOptions, "filePath"> = {},
 ): unknown[] {
-  const resolver = new TypeResolver(filePath);
-  const resolvedTypes = resolver.resolveAllTypes();
+    const resolver = new TypeResolver(filePath);
+    const resolvedTypes = resolver.resolveAllTypes();
 
-  if (!resolvedTypes[typeName]) {
-    throw new Error(
-      `Type "${typeName}" not found in file "${filePath}". ` +
-        `Available types: ${Object.keys(resolvedTypes).join(", ")}`
-    );
-  }
+    if (!resolvedTypes[typeName]) {
+        throw new Error(
+            `Type "${typeName}" not found in file "${filePath}". ` +
+                `Available types: ${Object.keys(resolvedTypes).join(", ")}`,
+        );
+    }
 
-  const generator = new MockGenerator(resolvedTypes, {
-    ...options,
-    filePath,
-  });
+    const generator = new MockGenerator(resolvedTypes, {
+        ...options,
+        filePath,
+    });
 
-  return Array.from({ length: count }, () => generator.generate(typeName));
+    return Array.from({ length: count }, () => generator.generate(typeName));
 }
 
 /**
@@ -111,7 +126,7 @@ export function createManyMocks(
  * ```
  */
 export function listTypes(filePath: string): string[] {
-  const resolver = new TypeResolver(filePath);
-  const resolvedTypes = resolver.resolveAllTypes();
-  return Object.keys(resolvedTypes);
+    const resolver = new TypeResolver(filePath);
+    const resolvedTypes = resolver.resolveAllTypes();
+    return Object.keys(resolvedTypes);
 }

@@ -122,6 +122,8 @@ export interface InterfaceTypeNode extends BaseTypeNode {
   properties: PropertyNode[];
   extends: string[];
   typeParameters: TypeNode[];
+  /** Names of the type parameters, e.g. ["T", "U"] for `interface Foo<T, U>` */
+  typeParameterNames: string[];
 }
 
 export interface ClassTypeNode extends BaseTypeNode {
@@ -262,7 +264,9 @@ export type TypeNode =
 export interface MockOptions {
   /** Path to the .ts file containing the type definition */
   filePath?: string;
-  /** Override specific property values */
+  /** Seed for deterministic random generation. Same seed → same output. */
+  seed?: number;
+  /** Override specific property values. Supports nested dot-notation keys (e.g. "address.city"). */
   overrides?: Record<string, unknown>;
   /** Custom generators for specific types */
   generators?: {

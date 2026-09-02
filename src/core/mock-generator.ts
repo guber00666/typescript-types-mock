@@ -12,14 +12,7 @@ import {
   EnumTypeNode,
   ResolvedTypes,
 } from "../types/index.js";
-import {
-  randomString,
-  randomNumber,
-  randomBoolean,
-  randomBigInt,
-  randomDate,
-  randomPick,
-} from "../utils/random.js";
+import { RandomGenerator } from "../utils/random.js";
 
 const DEFAULT_MAX_DEPTH = 5;
 const DEFAULT_ARRAY_LENGTH = 2;
@@ -31,6 +24,7 @@ export class MockGenerator {
   > &
     MockOptions;
   private visitedTypes: Set<string> = new Set();
+  private rng: RandomGenerator;
 
   constructor(resolvedTypes: ResolvedTypes, options: MockOptions = {}) {
     this.resolvedTypes = resolvedTypes;
@@ -40,16 +34,21 @@ export class MockGenerator {
       arrayLength: options.arrayLength ?? DEFAULT_ARRAY_LENGTH,
       includeOptional: options.includeOptional ?? true,
     };
+    this.rng = new RandomGenerator(options.seed);
   }
 
   /**
    * Generate a mock value for a given type name.
+   * Resets the visited-types tracker on each call so that
+   * repeated calls on the same MockGenerator instance work correctly.
    */
   generate(typeName: string): unknown {
     const typeNode = this.resolvedTypes[typeName];
     if (!typeNode) {
       throw new Error(`Type "${typeName}" not found in the resolved types.`);
     }
+    // Reset visited types for each top-level generate() call
+    this.visitedTypes = new Set();
     return this.generateValue(typeNode, 0);
   }
 
@@ -63,19 +62,21 @@ export class MockGenerator {
 
     switch (node.kind) {
       case TypeKind.String:
-        return this.options.generators?.string?.() ?? randomString();
+        return this.options.generators?.string?.() ?? this.rng.string();
 
       case TypeKind.Number:
-        return this.options.generators?.number?.() ?? randomNumber();
+        return this.options.generators?.number?.() ?? this.rng.number();
 
       case TypeKind.Boolean:
-        return this.options.generators?.boolean?.() ?? randomBoolean();
+        return this.options.generators?.boolean?.() ?? this.rng.boolean();
 
       case TypeKind.BigInt:
-        return randomBigInt();
+        // JSON-safe: generate number instead of BigInt (BigInt crashes JSON.stringify)
+        return this.rng.number(0, 1_000_000);
 
       case TypeKind.Symbol:
-        return Symbol("mock");
+        // JSON-safe: generate string instead of Symbol (Symbol is lost in serialization)
+        return "mock-symbol-" + this.rng.number(0, 10000);
 
       case TypeKind.Null:
         return null;
@@ -140,22 +141,27 @@ export class MockGenerator {
         return this.generateOmit(node.innerType, node.keys, depth);
 
       case TypeKind.Map:
+        // JSON-safe: generate a plain object instead of Map
         return this.generateMap(node.keyType, node.valueType, depth);
 
       case TypeKind.Set:
+        // JSON-safe: generate an array instead of Set
         return this.generateSet(node.elementType, depth);
 
       case TypeKind.Date:
-        return this.options.generators?.date?.() ?? randomDate();
+        // JSON-safe: generate ISO string instead of Date object
+        return (this.options.generators?.date?.() ?? this.rng.date()).toISOString();
 
       case TypeKind.RegExp:
-        return /mock-regex/g;
+        // JSON-safe: generate a string pattern instead of RegExp
+        return "^mock-pattern$";
 
       case TypeKind.Promise:
-        return Promise.resolve(this.generateValue(node.innerType, depth + 1));
+        // JSON-safe: return the resolved value directly, not wrapped in Promise
+        return this.generateValue(node.innerType, depth + 1);
 
       case TypeKind.Optional:
-        return this.options.includeOptional && randomBoolean()
+        return this.options.includeOptional && this.rng.boolean()
           ? this.generateValue(node.innerType, depth + 1)
           : undefined;
 
@@ -169,12 +175,12 @@ export class MockGenerator {
    */
   private generateAny(): unknown {
     const generators = [
-      () => randomString(),
-      () => randomNumber(),
-      () => randomBoolean(),
+      () => this.rng.string(),
+      () => this.rng.number(),
+      () => this.rng.boolean(),
       () => null,
     ];
-    return randomPick(generators)();
+    return this.rng.pick(generators)();
   }
 
   /**
@@ -206,15 +212,37 @@ export class MockGenerator {
       }
 
       // For optional properties, randomly include them
-      if (prop.optional && !randomBoolean()) {
+      if (prop.optional && !this.rng.boolean()) {
         continue;
       }
 
-      let value = this.generateValue(prop.type, depth + 1);
+      let value: unknown;
 
-      // Apply overrides
+      // Use property-name-aware generators for string types
+      if (prop.type.kind === TypeKind.String) {
+        const semantic = this.options.generators?.string?.() ?? this.rng.stringForProperty(prop.name);
+        value = semantic ?? this.generateValue(prop.type, depth + 1);
+      } else {
+        value = this.generateValue(prop.type, depth + 1);
+      }
+
+      // Apply overrides (supports nested merging for objects)
       if (this.options.overrides && prop.name in this.options.overrides) {
-        value = this.options.overrides[prop.name];
+        const override = this.options.overrides[prop.name];
+
+        if (
+          typeof override === "object" &&
+          override !== null &&
+          !Array.isArray(override) &&
+          typeof value === "object" &&
+          value !== null &&
+          !Array.isArray(value)
+        ) {
+          // Deep merge: keep generated values and apply overrides on top
+          value = { ...(value as Record<string, unknown>), ...(override as Record<string, unknown>) };
+        } else {
+          value = override;
+        }
       }
 
       result[prop.name] = value;
@@ -247,15 +275,7 @@ export class MockGenerator {
 
     this.visitedTypes.delete(node.name);
 
-    // Apply overrides
-    if (this.options.overrides) {
-      for (const [key, value] of Object.entries(this.options.overrides)) {
-        if (key in result) {
-          result[key] = value;
-        }
-      }
-    }
-
+    // Note: overrides are already applied in generateObject() with proper merging
     return result;
   }
 
@@ -290,7 +310,7 @@ export class MockGenerator {
    * Generate a mock for an enum type (picks a random member).
    */
   private generateEnum(node: EnumTypeNode): string | number {
-    const member = randomPick(node.members);
+    const member = this.rng.pick(node.members);
     return member.value;
   }
 
@@ -309,11 +329,11 @@ export class MockGenerator {
       (t) => t.kind !== TypeKind.Null && t.kind !== TypeKind.Undefined
     );
 
-    if (nonNullTypes.length > 0 && randomBoolean()) {
-      return this.generateValue(randomPick(nonNullTypes), depth + 1);
+    if (nonNullTypes.length > 0 && this.rng.boolean()) {
+      return this.generateValue(this.rng.pick(nonNullTypes), depth + 1);
     }
 
-    return this.generateValue(randomPick(validTypes), depth + 1);
+    return this.generateValue(this.rng.pick(validTypes), depth + 1);
   }
 
   /**
@@ -334,18 +354,144 @@ export class MockGenerator {
 
   /**
    * Generate a mock for a type reference.
+   * Supports generic type argument substitution: ApiResponse<User> → substitutes T with User.
    */
   private generateTypeReference(
     name: string,
-    _typeArguments: TypeNode[],
+    typeArguments: TypeNode[],
     depth: number
   ): unknown {
     const resolvedType = this.resolvedTypes[name];
-    if (resolvedType) {
-      return this.generateValue(resolvedType, depth + 1);
+    if (!resolvedType) {
+      // Unknown reference — return a placeholder
+      return undefined;
     }
-    // Unknown reference — return a placeholder
-    return undefined;
+
+    // If there are type arguments and the resolved type has type parameters,
+    // substitute them (e.g., ApiResponse<User> → data: User instead of data: T)
+    if (
+      typeArguments.length > 0 &&
+      resolvedType.kind === TypeKind.Interface &&
+      resolvedType.typeParameters.length > 0
+    ) {
+      const paramMapping = new Map<string, TypeNode>();
+      resolvedType.typeParameterNames.forEach((paramName, index) => {
+        if (typeArguments[index]) {
+          paramMapping.set(paramName, typeArguments[index]!);
+        }
+      });
+
+      if (paramMapping.size > 0) {
+        const substituted = this.substituteTypeParams(resolvedType, paramMapping);
+        return this.generateValue(substituted, depth + 1);
+      }
+    }
+
+    return this.generateValue(resolvedType, depth + 1);
+  }
+
+  /**
+   * Deep-clone a TypeNode and replace type parameter references with concrete types.
+   */
+  private substituteTypeParams(node: TypeNode, mapping: Map<string, TypeNode>): TypeNode {
+    // If this is a TypeReference to a type parameter name, substitute it
+    if (node.kind === TypeKind.TypeReference && mapping.has(node.name) && node.typeArguments.length === 0) {
+      return mapping.get(node.name)!;
+    }
+
+    switch (node.kind) {
+      case TypeKind.Interface:
+        return {
+          ...node,
+          properties: node.properties.map((p) => ({
+            ...p,
+            type: this.substituteTypeParams(p.type, mapping),
+          })),
+        };
+
+      case TypeKind.Object:
+        return {
+          ...node,
+          properties: node.properties.map((p) => ({
+            ...p,
+            type: this.substituteTypeParams(p.type, mapping),
+          })),
+        };
+
+      case TypeKind.Array:
+        return {
+          ...node,
+          elementType: this.substituteTypeParams(node.elementType, mapping),
+        };
+
+      case TypeKind.Union:
+        return {
+          ...node,
+          types: node.types.map((t) => this.substituteTypeParams(t, mapping)),
+        };
+
+      case TypeKind.Intersection:
+        return {
+          ...node,
+          types: node.types.map((t) => this.substituteTypeParams(t, mapping)),
+        };
+
+      case TypeKind.Tuple:
+        return {
+          ...node,
+          elements: node.elements.map((e) => this.substituteTypeParams(e, mapping)),
+        };
+
+      case TypeKind.Record:
+        return {
+          ...node,
+          keyType: this.substituteTypeParams(node.keyType, mapping),
+          valueType: this.substituteTypeParams(node.valueType, mapping),
+        };
+
+      case TypeKind.Map:
+        return {
+          ...node,
+          keyType: this.substituteTypeParams(node.keyType, mapping),
+          valueType: this.substituteTypeParams(node.valueType, mapping),
+        };
+
+      case TypeKind.Set:
+        return {
+          ...node,
+          elementType: this.substituteTypeParams(node.elementType, mapping),
+        };
+
+      case TypeKind.Partial:
+        return {
+          ...node,
+          innerType: this.substituteTypeParams(node.innerType, mapping),
+        };
+
+      case TypeKind.Required:
+        return {
+          ...node,
+          innerType: this.substituteTypeParams(node.innerType, mapping),
+        };
+
+      case TypeKind.Promise:
+        return {
+          ...node,
+          innerType: this.substituteTypeParams(node.innerType, mapping),
+        };
+
+      case TypeKind.TypeReference:
+        if (mapping.has(node.name) && node.typeArguments.length === 0) {
+          return mapping.get(node.name)!;
+        }
+        return {
+          ...node,
+          typeArguments: node.typeArguments.map((a) => this.substituteTypeParams(a, mapping)),
+        };
+
+      default:
+        return node;
+    }
   }
 
   /**
@@ -385,7 +531,7 @@ export class MockGenerator {
       // Randomly omit some properties
       const result: Record<string, unknown> = {};
       for (const key of keys) {
-        if (randomBoolean()) {
+        if (this.rng.boolean()) {
           result[key] = obj[key];
         }
       }
@@ -438,37 +584,44 @@ export class MockGenerator {
   }
 
   /**
-   * Generate a Map<K, V> mock.
+   * Generate a Map<K, V> mock as a plain object (JSON-safe).
    */
   private generateMap(
     keyType: TypeNode,
     valueType: TypeNode,
     depth: number
-  ): Map<unknown, unknown> {
-    const map = new Map();
+  ): Record<string, unknown> {
+    const result: Record<string, unknown> = {};
     const count = this.options.arrayLength;
 
     for (let i = 0; i < count; i++) {
-      const key = this.generateValue(keyType, depth + 1);
+      const key = this.generateKeyString(keyType, i);
       const value = this.generateValue(valueType, depth + 1);
-      map.set(key, value);
+      result[key] = value;
     }
 
-    return map;
+    return result;
   }
 
   /**
-   * Generate a Set<T> mock.
+   * Generate a Set<T> mock as an array (JSON-safe).
    */
-  private generateSet(elementType: TypeNode, depth: number): Set<unknown> {
-    const set = new Set();
+  private generateSet(elementType: TypeNode, depth: number): unknown[] {
+    const result: unknown[] = [];
     const count = this.options.arrayLength;
+    const seen = new Set<string>();
 
     for (let i = 0; i < count; i++) {
-      set.add(this.generateValue(elementType, depth + 1));
+      const value = this.generateValue(elementType, depth + 1);
+      const key = JSON.stringify(value);
+      // Ensure uniqueness like a real Set
+      if (!seen.has(key)) {
+        seen.add(key);
+        result.push(value);
+      }
     }
 
-    return set;
+    return result;
   }
 
   /**

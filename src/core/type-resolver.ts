@@ -30,8 +30,31 @@ export class TypeResolver {
   private sourceFile: SourceFile;
   private resolving: Set<string> = new Set();
 
+  /** The resolved absolute path of the source file */
+  public readonly filePath: string;
+
   constructor(filePath: string) {
-    const tsConfigPath = this.findTsConfig(filePath);
+    // Normalize to absolute path
+    const absolutePath = pathModule.resolve(filePath);
+
+    // Validate file existence
+    if (!fs.existsSync(absolutePath)) {
+      throw new Error(
+        `TypeResolver: file not found: "${absolutePath}". ` +
+        `Make sure the path is correct and the file exists. ` +
+        `Original path: "${filePath}", CWD: "${process.cwd()}"`
+      );
+    }
+
+    // Validate it's a .ts file
+    if (!absolutePath.endsWith(".ts") && !absolutePath.endsWith(".tsx")) {
+      throw new Error(
+        `TypeResolver: expected a .ts or .tsx file, got: "${absolutePath}"`
+      );
+    }
+
+    this.filePath = absolutePath;
+    const tsConfigPath = this.findTsConfig(absolutePath);
 
     this.project = new Project(
       tsConfigPath
@@ -48,7 +71,7 @@ export class TypeResolver {
             },
           }
     );
-    this.sourceFile = this.project.addSourceFileAtPath(filePath);
+    this.sourceFile = this.project.addSourceFileAtPath(absolutePath);
   }
 
   /**
@@ -138,7 +161,14 @@ export class TypeResolver {
     this.resolving.add(name);
 
     const properties = iface.getProperties().map((p) => this.resolvePropertySignature(p));
-    const extendsExprs = iface.getExtends().map((e) => e.getText());
+    // Extract only the base type name, stripping generic arguments
+    // e.g. "BaseType<Arg>" → "BaseType"
+    const extendsExprs = iface.getExtends().map((e) => {
+      const text = e.getText();
+      const angleBracket = text.indexOf("<");
+      return angleBracket !== -1 ? text.slice(0, angleBracket) : text;
+    });
+    const typeParameterNames = iface.getTypeParameters().map((tp) => tp.getName());
     const typeParameters = iface.getTypeParameters().map((tp) => {
       const constraint = tp.getConstraint();
       return constraint
@@ -154,6 +184,7 @@ export class TypeResolver {
       properties,
       extends: extendsExprs,
       typeParameters,
+      typeParameterNames,
     };
   }
 
@@ -212,7 +243,12 @@ export class TypeResolver {
       .map((p) => this.resolvePropertyDeclaration(p));
 
     const baseClass = cls.getBaseClass();
-    const implementedInterfaces = cls.getImplements().map((i) => i.getText());
+    // Strip generic arguments from implements expressions
+    const implementedInterfaces = cls.getImplements().map((i) => {
+      const text = i.getText();
+      const angleBracket = text.indexOf("<");
+      return angleBracket !== -1 ? text.slice(0, angleBracket) : text;
+    });
 
     this.resolving.delete(name);
 
