@@ -6,8 +6,10 @@
  */
 
 export { TypeResolver } from "./core/type-resolver.js";
+export { BrowserTypeResolver } from "./core/browser-type-resolver.js";
+export type { ITypeResolver } from "./core/type-resolver-interface.js";
 export { MockGenerator } from "./core/mock-generator.js";
-export { MockContext, createMockContext } from "./core/mock-context.js";
+export { MockContext, MockContextBase, createMockContext } from "./core/mock-context.js";
 export type {
     MockOptions,
     TypeNode,

@@ -54,9 +54,9 @@ describe("TypeResolver", () => {
       expect(type?.kind).toBe(TypeKind.Union);
     });
 
-    it("should return null for non-existent type", () => {
+    it("should return undefined for non-existent type", () => {
       const type = resolver.resolveType("NonExistentType");
-      expect(type).toBeNull();
+      expect(type).toBeUndefined();
     });
   });
 

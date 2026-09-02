@@ -209,6 +209,132 @@ const users = createManyMocks("./types.ts", "User", 5, {
 // => Array of 5 User objects
 ```
 
+## Browser Usage
+
+The package works in browser environments via a pre-built JSON schema generated at build time.
+
+### Step 1: Generate schema at build time
+
+Use the CLI tool to extract type information into a JSON file:
+
+```bash
+npx typescript-types-mock generate ./src/types.ts -o ./src/types.schema.json
+```
+
+Or add it to your build script:
+
+```json
+{
+  "scripts": {
+    "build:schema": "typescript-types-mock generate ./src/types.ts -o ./public/types.schema.json --pretty"
+  }
+}
+```
+
+### Step 2: Import and use in browser code
+
+```typescript
+import schema from "./types.schema.json";
+import { createMockContext } from "typescript-types-mock/browser";
+
+const ctx = createMockContext(schema, { seed: 42 });
+const user = ctx.mock("User");
+const users = ctx.many("User", 10);
+```
+
+Or use the lower-level API:
+
+```typescript
+import schema from "./types.schema.json";
+import { createMockFromSchema } from "typescript-types-mock/browser";
+
+const user = createMockFromSchema(schema, "User", {
+  overrides: { name: "Alice" },
+});
+```
+
+### Browser API
+
+The `/browser` entry point exports browser-safe functions:
+
+- `createMockContext(schema, options?)` — caching context for fast repeated calls
+- `createMockFromSchema(schema, typeName, options?)` — create a single mock
+- `createManyMocksFromSchema(schema, typeName, count, options?)` — create multiple mocks
+- `listTypesFromSchema(schema)` — list all available type names
+- `BrowserTypeResolver` — low-level resolver wrapper
+- `MockContextBase` — base class for custom contexts
+- `RandomGenerator` — random value generator
+- `createRouteResponse`, `createApiResponse`, `createPaginatedResponse` — Playwright helpers
+
+## Playwright Integration
+
+In Playwright tests (Node.js environment), use the main API directly:
+
+```typescript
+import { createMockFromFile, createRouteResponse } from "typescript-types-mock";
+import { test, expect } from "@playwright/test";
+
+test("mock API response", async ({ page }) => {
+  await page.route("**/api/users", (route) => {
+    const user = createMockFromFile("./types.ts", "User");
+    route.fulfill(createRouteResponse(user));
+  });
+
+  await page.goto("/users");
+  // Your test assertions...
+});
+```
+
+With custom status and headers:
+
+```typescript
+await page.route("**/api/users", (route) => {
+  const user = createMockFromFile("./types.ts", "User", {
+    overrides: { role: "admin" },
+  });
+  route.fulfill(createRouteResponse(user, { status: 201 }));
+});
+```
+
+API response wrapper:
+
+```typescript
+await page.route("**/api/users", (route) => {
+  const user = createMockFromFile("./types.ts", "User");
+  const response = createApiResponse(user);
+  route.fulfill(createRouteResponse(response));
+});
+```
+
+## CLI Reference
+
+### `typescript-types-mock generate`
+
+Generate a JSON type schema from a TypeScript file for browser usage.
+
+**Usage:**
+```bash
+typescript-types-mock generate <input.ts> [options]
+```
+
+**Options:**
+- `-o, --output <file>` — Output file path (default: `<input>.schema.json`)
+- `--pretty` — Pretty-print JSON output (default: minified)
+- `-h, --help` — Show help message
+
+**Examples:**
+```bash
+# Generate schema with default output name
+typescript-types-mock generate ./src/types.ts
+# → creates ./src/types.schema.json
+
+# Specify output path
+typescript-types-mock generate ./src/types.ts -o ./public/types.schema.json
+
+# Pretty-print for debugging
+typescript-types-mock generate ./src/types.ts --pretty
+```
+
 ## How It Works
 
 1. **Parsing**: Uses [ts-morph](https://ts-morph.com/) (TypeScript Compiler API wrapper) to parse `.ts` source files and extract type information (interfaces, type aliases, enums, classes).

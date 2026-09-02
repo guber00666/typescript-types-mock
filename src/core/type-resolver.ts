@@ -24,8 +24,9 @@ import {
   PropertyNode,
   ResolvedTypes,
 } from "../types/index.js";
+import type { ITypeResolver } from "./type-resolver-interface.js";
 
-export class TypeResolver {
+export class TypeResolver implements ITypeResolver {
   private project: Project;
   private sourceFile: SourceFile;
   private resolving: Set<string> = new Set();
@@ -128,7 +129,7 @@ export class TypeResolver {
   /**
    * Resolve a single type by name.
    */
-  resolveType(typeName: string): TypeNode | null {
+  resolveType(typeName: string): TypeNode | undefined {
     // Try interface
     const iface = this.sourceFile.getInterface(typeName);
     if (iface) return this.resolveInterface(iface);
@@ -145,7 +146,7 @@ export class TypeResolver {
     const cls = this.sourceFile.getClass(typeName);
     if (cls) return this.resolveClass(cls);
 
-    return null;
+    return undefined;
   }
 
   /**

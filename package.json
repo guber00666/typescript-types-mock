@@ -1,13 +1,20 @@
 {
   "name": "typescript-types-mock",
-  "version": "0.2.0",
-  "description": "Generate mock objects from TypeScript types at runtime using ts-morph",
+  "version": "0.3.0",
+  "description": "Generate mock objects from TypeScript types at runtime using ts-morph. Works in Node.js and browser environments.",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "bin": {
+    "typescript-types-mock": "./dist/cli/generate-schema.js"
+  },
   "exports": {
     ".": {
+      "browser": {
+        "types": "./dist/browser.d.ts",
+        "default": "./dist/browser.js"
+      },
       "import": {
         "types": "./dist/index.d.ts",
         "default": "./dist/index.js"
@@ -16,8 +23,13 @@
         "types": "./dist/index.d.cts",
         "default": "./dist/index.cjs"
       }
+    },
+    "./browser": {
+      "types": "./dist/browser.d.ts",
+      "default": "./dist/browser.js"
     }
   },
+  "browser": "./dist/browser.js",
   "files": [
     "dist"
   ],
@@ -27,6 +39,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "generate-schema": "node ./dist/cli/generate-schema.js",
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",
     "prepublishOnly": "npm run build"
@@ -48,17 +61,22 @@
     "url": "https://github.com/guber00666/typescript-types-mock.git"
   },
   "peerDependencies": {
+    "ts-morph": ">=25.0.0",
     "typescript": ">=5.0.0"
   },
-  "dependencies": {
-    "ts-morph": "^25.0.0"
+  "peerDependenciesMeta": {
+    "ts-morph": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@microsoft/api-extractor": "^7.59.0",
     "@rslib/core": "^0.23.2",
     "@types/node": "^26.4.0",
     "@vitest/coverage-v8": "^3.0.0",
+    "jsdom": "^30.0.1",
     "oxlint": "^0.16.0",
+    "ts-morph": "^25.0.0",
     "typescript": "^7.0.0",
     "vitest": "^3.0.0"
   }

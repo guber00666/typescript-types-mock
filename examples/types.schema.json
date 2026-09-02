@@ -1,0 +1,448 @@
+{
+  "Address": {
+    "kind": "interface",
+    "name": "Address",
+    "properties": [
+      {
+        "name": "street",
+        "type": {
+          "kind": "string"
+        },
+        "optional": false,
+        "readonly": false
+      },
+      {
+        "name": "city",
+        "type": {
+          "kind": "string"
+        },
+        "optional": false,
+        "readonly": false
+      },
+      {
+        "name": "zipCode",
+        "type": {
+          "kind": "string"
+        },
+        "optional": false,
+        "readonly": false
+      },
+      {
+        "name": "country",
+        "type": {
+          "kind": "string"
+        },
+        "optional": false,
+        "readonly": false
+      }
+    ],
+    "extends": [],
+    "typeParameters": [],
+    "typeParameterNames": []
+  },
+  "User": {
+    "kind": "interface",
+    "name": "User",
+    "properties": [
+      {
+        "name": "id",
+        "type": {
+          "kind": "string"
+        },
+        "optional": false,
+        "readonly": false
+      },
+      {
+        "name": "name",
+        "type": {
+          "kind": "string"
+        },
+        "optional": false,
+        "readonly": false
+      },
+      {
+        "name": "email",
+        "type": {
+          "kind": "string"
+        },
+        "optional": false,
+        "readonly": false
+      },
+      {
+        "name": "age",
+        "type": {
+          "kind": "number"
+        },
+        "optional": false,
+        "readonly": false
+      },
+      {
+        "name": "role",
+        "type": {
+          "kind": "type_reference",
+          "name": "UserRole",
+          "typeArguments": []
+        },
+        "optional": false,
+        "readonly": false
+      },
+      {
+        "name": "address",
+        "type": {
+          "kind": "type_reference",
+          "name": "Address",
+          "typeArguments": []
+        },
+        "optional": false,
+        "readonly": false
+      },
+      {
+        "name": "phone",
+        "type": {
+          "kind": "string"
+        },
+        "optional": true,
+        "readonly": false
+      },
+      {
+        "name": "avatar",
+        "type": {
+          "kind": "string"
+        },
+        "optional": true,
+        "readonly": false
+      }
+    ],
+    "extends": [],
+    "typeParameters": [],
+    "typeParameterNames": []
+  },
+  "Product": {
+    "kind": "interface",
+    "name": "Product",
+    "properties": [
+      {
+        "name": "id",
+        "type": {
+          "kind": "string"
+        },
+        "optional": false,
+        "readonly": false
+      },
+      {
+        "name": "title",
+        "type": {
+          "kind": "string"
+        },
+        "optional": false,
+        "readonly": false
+      },
+      {
+        "name": "description",
+        "type": {
+          "kind": "string"
+        },
+        "optional": false,
+        "readonly": false
+      },
+      {
+        "name": "price",
+        "type": {
+          "kind": "number"
+        },
+        "optional": false,
+        "readonly": false
+      },
+      {
+        "name": "inStock",
+        "type": {
+          "kind": "boolean"
+        },
+        "optional": false,
+        "readonly": false
+      },
+      {
+        "name": "tags",
+        "type": {
+          "kind": "array",
+          "elementType": {
+            "kind": "string"
+          }
+        },
+        "optional": false,
+        "readonly": false
+      },
+      {
+        "name": "category",
+        "type": {
+          "kind": "union",
+          "types": [
+            {
+              "kind": "literal",
+              "value": "electronics"
+            },
+            {
+              "kind": "literal",
+              "value": "clothing"
+            },
+            {
+              "kind": "literal",
+              "value": "books"
+            },
+            {
+              "kind": "literal",
+              "value": "food"
+            }
+          ]
+        },
+        "optional": false,
+        "readonly": false
+      }
+    ],
+    "extends": [],
+    "typeParameters": [],
+    "typeParameterNames": []
+  },
+  "OrderItem": {
+    "kind": "interface",
+    "name": "OrderItem",
+    "properties": [
+      {
+        "name": "product",
+        "type": {
+          "kind": "type_reference",
+          "name": "Product",
+          "typeArguments": []
+        },
+        "optional": false,
+        "readonly": false
+      },
+      {
+        "name": "quantity",
+        "type": {
+          "kind": "number"
+        },
+        "optional": false,
+        "readonly": false
+      }
+    ],
+    "extends": [],
+    "typeParameters": [],
+    "typeParameterNames": []
+  },
+  "Order": {
+    "kind": "interface",
+    "name": "Order",
+    "properties": [
+      {
+        "name": "id",
+        "type": {
+          "kind": "string"
+        },
+        "optional": false,
+        "readonly": false
+      },
+      {
+        "name": "user",
+        "type": {
+          "kind": "type_reference",
+          "name": "User",
+          "typeArguments": []
+        },
+        "optional": false,
+        "readonly": false
+      },
+      {
+        "name": "items",
+        "type": {
+          "kind": "array",
+          "elementType": {
+            "kind": "type_reference",
+            "name": "OrderItem",
+            "typeArguments": []
+          }
+        },
+        "optional": false,
+        "readonly": false
+      },
+      {
+        "name": "status",
+        "type": {
+          "kind": "type_reference",
+          "name": "OrderStatus",
+          "typeArguments": []
+        },
+        "optional": false,
+        "readonly": false
+      },
+      {
+        "name": "paymentMethod",
+        "type": {
+          "kind": "type_reference",
+          "name": "PaymentMethod",
+          "typeArguments": []
+        },
+        "optional": false,
+        "readonly": false
+      },
+      {
+        "name": "totalAmount",
+        "type": {
+          "kind": "number"
+        },
+        "optional": false,
+        "readonly": false
+      },
+      {
+        "name": "createdAt",
+        "type": {
+          "kind": "string"
+        },
+        "optional": false,
+        "readonly": false
+      }
+    ],
+    "extends": [],
+    "typeParameters": [],
+    "typeParameterNames": []
+  },
+  "ApiResponse": {
+    "kind": "interface",
+    "name": "ApiResponse",
+    "properties": [
+      {
+        "name": "data",
+        "type": {
+          "kind": "type_reference",
+          "name": "T",
+          "typeArguments": []
+        },
+        "optional": false,
+        "readonly": false
+      },
+      {
+        "name": "error",
+        "type": {
+          "kind": "union",
+          "types": [
+            {
+              "kind": "string"
+            },
+            {
+              "kind": "null"
+            }
+          ]
+        },
+        "optional": false,
+        "readonly": false
+      },
+      {
+        "name": "status",
+        "type": {
+          "kind": "number"
+        },
+        "optional": false,
+        "readonly": false
+      },
+      {
+        "name": "timestamp",
+        "type": {
+          "kind": "string"
+        },
+        "optional": false,
+        "readonly": false
+      }
+    ],
+    "extends": [],
+    "typeParameters": [
+      {
+        "kind": "any"
+      }
+    ],
+    "typeParameterNames": [
+      "T"
+    ]
+  },
+  "UserRole": {
+    "kind": "union",
+    "types": [
+      {
+        "kind": "literal",
+        "value": "admin"
+      },
+      {
+        "kind": "literal",
+        "value": "manager"
+      },
+      {
+        "kind": "literal",
+        "value": "customer"
+      }
+    ]
+  },
+  "OrderStatus": {
+    "kind": "union",
+    "types": [
+      {
+        "kind": "literal",
+        "value": "pending"
+      },
+      {
+        "kind": "literal",
+        "value": "processing"
+      },
+      {
+        "kind": "literal",
+        "value": "shipped"
+      },
+      {
+        "kind": "literal",
+        "value": "delivered"
+      },
+      {
+        "kind": "literal",
+        "value": "cancelled"
+      }
+    ]
+  },
+  "UserResponse": {
+    "kind": "type_reference",
+    "name": "ApiResponse",
+    "typeArguments": [
+      {
+        "kind": "type_reference",
+        "name": "User",
+        "typeArguments": []
+      }
+    ]
+  },
+  "OrderResponse": {
+    "kind": "type_reference",
+    "name": "ApiResponse",
+    "typeArguments": [
+      {
+        "kind": "type_reference",
+        "name": "Order",
+        "typeArguments": []
+      }
+    ]
+  },
+  "PaymentMethod": {
+    "kind": "enum",
+    "name": "PaymentMethod",
+    "members": [
+      {
+        "name": "CreditCard",
+        "value": "CREDIT_CARD"
+      },
+      {
+        "name": "PayPal",
+        "value": "PAYPAL"
+      },
+      {
+        "name": "BankTransfer",
+        "value": "BANK_TRANSFER"
+      }
+    ]
+  }
+}
