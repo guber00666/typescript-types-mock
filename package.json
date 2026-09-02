@@ -1,6 +1,6 @@
 {
   "name": "typescript-types-mock",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Generate mock objects from TypeScript types at runtime using ts-morph",
   "type": "module",
   "main": "./dist/index.cjs",
