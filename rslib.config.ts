@@ -1,4 +1,7 @@
 import { defineConfig } from "@rslib/core";
+import { execSync } from "child_process";
+import fs from "fs";
+import path from "path";
 
 export default defineConfig({
   lib: [
@@ -80,6 +83,33 @@ export default defineConfig({
         },
         filename: {
           js: "[name].js",
+        },
+      },
+      tools: {
+        rspack: {
+          plugins: [
+            {
+              name: "make-bin-executable",
+              apply(compiler) {
+                compiler.hooks.afterEmit.tap("MakeBinExecutable", () => {
+                  const binPath = path.resolve("./dist/cli/generate-schema.js");
+                  if (fs.existsSync(binPath)) {
+                    // Add shebang if missing
+                    const content = fs.readFileSync(binPath, "utf-8");
+                    if (!content.startsWith("#!/usr/bin/env node")) {
+                      fs.writeFileSync(binPath, "#!/usr/bin/env node\n" + content);
+                    }
+                    // Make executable
+                    try {
+                      execSync(`chmod +x "${binPath}"`, { stdio: "ignore" });
+                    } catch {
+                      // Ignore errors on Windows
+                    }
+                  }
+                });
+              },
+            },
+          ],
         },
       },
     },

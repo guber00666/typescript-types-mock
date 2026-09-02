@@ -1,6 +1,6 @@
 {
   "name": "typescript-types-mock",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Generate mock objects from TypeScript types at runtime using ts-morph. Works in Node.js and browser environments.",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -58,7 +58,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/guber00666/typescript-types-mock.git"
+    "url": "git+https://github.com/guber00666/typescript-types-mock.git"
   },
   "peerDependencies": {
     "ts-morph": ">=25.0.0",
