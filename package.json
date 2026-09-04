@@ -1,35 +1,47 @@
 {
   "name": "typescript-types-mock",
-  "version": "0.4.0",
-  "description": "Generate mock objects from TypeScript types for Playwright tests. Resolves types across local modules and npm packages.",
+  "version": "1.0.0",
+  "description": "Generate mock objects from TypeScript types for Playwright tests. Rust-powered, 10-50x faster than ts-morph.",
   "type": "module",
-  "main": "./dist/index.cjs",
-  "module": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "main": "./index.cjs",
+  "types": "./index.d.ts",
+  "napi": {
+    "name": "typescript-types-mock",
+    "triples": {
+      "defaults": true,
+      "additional": [
+        "x86_64-unknown-linux-musl",
+        "aarch64-unknown-linux-gnu",
+        "aarch64-apple-darwin",
+        "aarch64-unknown-linux-musl",
+        "armv7-unknown-linux-gnueabihf"
+      ]
+    }
+  },
   "exports": {
     ".": {
-      "import": {
-        "types": "./dist/index.d.ts",
-        "default": "./dist/index.js"
-      },
-      "require": {
-        "types": "./dist/index.d.cts",
-        "default": "./dist/index.cjs"
-      }
+      "import": "./index.cjs",
+      "require": "./index.cjs",
+      "types": "./index.d.ts"
     }
   },
   "files": [
-    "dist"
+    "index.cjs",
+    "index.d.ts"
   ],
   "scripts": {
-    "build": "rslib build",
-    "dev": "rslib build --watch",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage",
+    "artifacts": "napi artifacts",
+    "build": "napi build --platform --release",
+    "build:debug": "napi build --platform",
+    "prepublishOnly": "napi prepublish -t npm",
+    "universal": "napi universal",
+    "version": "napi version",
+    "test": "ava",
+    "test:legacy": "vitest run",
+    "test:legacy:watch": "vitest",
+    "test:legacy:coverage": "vitest run --coverage",
     "lint": "oxlint",
-    "lint:fix": "oxlint --fix",
-    "prepublishOnly": "npm run build"
+    "lint:fix": "oxlint --fix"
   },
   "keywords": [
     "typescript",
@@ -38,10 +50,12 @@
     "testing",
     "e2e",
     "codegen",
-    "ts-morph",
+    "rust",
+    "napi",
     "test-data",
     "fixtures",
-    "route-interception"
+    "route-interception",
+    "performance"
   ],
   "author": "fess00666",
   "license": "MIT",
@@ -49,16 +63,9 @@
     "type": "git",
     "url": "git+https://github.com/guber00666/typescript-types-mock.git"
   },
-  "peerDependencies": {
-    "ts-morph": ">=25.0.0",
-    "typescript": ">=5.0.0"
-  },
-  "peerDependenciesMeta": {
-    "ts-morph": {
-      "optional": true
-    }
-  },
   "devDependencies": {
+    "@napi-rs/cli": "^2.18.0",
+    "ava": "^6.0.0",
     "@microsoft/api-extractor": "^7.59.0",
     "@rslib/core": "^0.23.2",
     "@types/node": "^26.4.0",
@@ -67,5 +74,8 @@
     "ts-morph": "^25.0.0",
     "typescript": "^7.0.0",
     "vitest": "^3.0.0"
+  },
+  "engines": {
+    "node": ">= 18"
   }
 }

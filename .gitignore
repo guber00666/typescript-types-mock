@@ -8,3 +8,6 @@ coverage/
 .rslib/
 logs/
 .npmrc
+target/
+*.node
+Cargo.lock.bak
