@@ -86,8 +86,6 @@ jobs:
               set -e &&
               rustup update stable &&
               rustup default stable &&
-              apk del llvm19 llvm19-dev 2>/dev/null || true &&
-              apk add --upgrade clang-static llvm-dev &&
               npm install &&
               npm run build -- --target aarch64-unknown-linux-musl &&
               /aarch64-linux-musl-cross/bin/aarch64-linux-musl-strip *.node
