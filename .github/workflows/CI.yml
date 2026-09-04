@@ -48,11 +48,9 @@ jobs:
             setup: |
               sudo apt-get update -y
               sudo apt-get install -y musl-tools
-              mkdir -p .cargo
-              printf '[target.x86_64-unknown-linux-musl]\nlinker = "musl-gcc"\n' > .cargo/config.toml
             build: |
               rustup target add x86_64-unknown-linux-musl
-              npm run build -- --target x86_64-unknown-linux-musl
+              CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER=musl-gcc npm run build -- --target x86_64-unknown-linux-musl
               strip *.node
           - host: macos-latest
             target: aarch64-apple-darwin
@@ -92,11 +90,9 @@ jobs:
               curl -fsSL https://musl.cc/aarch64-linux-musl-cross.tgz -o /tmp/aarch64-linux-musl-cross.tgz
               tar -xzf /tmp/aarch64-linux-musl-cross.tgz -C /tmp/
               echo "/tmp/aarch64-linux-musl-cross/bin" >> $GITHUB_PATH
-              mkdir -p .cargo
-              printf '[target.aarch64-unknown-linux-musl]\nlinker = "aarch64-linux-musl-gcc"\n' > .cargo/config.toml
             build: |
               rustup target add aarch64-unknown-linux-musl
-              npm run build -- --target aarch64-unknown-linux-musl
+              CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER=aarch64-linux-musl-gcc npm run build -- --target aarch64-unknown-linux-musl
               aarch64-linux-musl-strip *.node
     name: stable - ${{ matrix.settings.target }} - node@20
     runs-on: ${{ matrix.settings.host }}
