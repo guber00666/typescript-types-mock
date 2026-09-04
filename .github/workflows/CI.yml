@@ -86,11 +86,16 @@ jobs:
           - host: ubuntu-latest
             target: aarch64-unknown-linux-musl
             build: |
+              set -ex
               rustup target add aarch64-unknown-linux-musl
+              pip3 install cargo-zigbuild
+              zig version
               CC="zig cc -target aarch64-linux-musl" \
+              AR="zig ar" \
               CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER="zig cc -target aarch64-linux-musl" \
               npm run build -- --target aarch64-unknown-linux-musl
-              aarch64-linux-musl-strip *.node 2>/dev/null || strip *.node 2>/dev/null || true
+              ls -la *.node || echo "NO .node FILES"
+              strip *.node 2>/dev/null || true
     name: stable - ${{ matrix.settings.target }} - node@20
     runs-on: ${{ matrix.settings.host }}
     steps:
@@ -116,7 +121,7 @@ jobs:
         uses: goto-bus-stop/setup-zig@v2
         if: ${{ contains(matrix.settings.target, 'musl') }}
         with:
-          version: 0.13.0
+          version: 0.14.0
       - name: Setup toolchain
         run: ${{ matrix.settings.setup }}
         if: ${{ matrix.settings.setup }}
