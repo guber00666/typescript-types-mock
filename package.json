@@ -18,6 +18,14 @@
       ]
     }
   },
+  "ava": {
+    "files": [
+      "**/*.test.cjs"
+    ],
+    "extensions": {
+      "cjs": true
+    }
+  },
   "exports": {
     ".": {
       "import": "./index.cjs",
