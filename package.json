@@ -1,6 +1,6 @@
 {
   "name": "typescript-types-mock",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Generate mock objects from TypeScript types for Playwright tests. Rust-powered, 10-50x faster than ts-morph.",
   "type": "module",
   "main": "./index.cjs",
@@ -80,13 +80,13 @@
     "node": ">= 18"
   },
   "optionalDependencies": {
-    "typescript-types-mock-win32-x64-msvc": "1.0.1",
-    "typescript-types-mock-darwin-x64": "1.0.1",
-    "typescript-types-mock-linux-x64-gnu": "1.0.1",
-    "typescript-types-mock-linux-x64-musl": "1.0.1",
-    "typescript-types-mock-linux-arm64-gnu": "1.0.1",
-    "typescript-types-mock-darwin-arm64": "1.0.1",
-    "typescript-types-mock-linux-arm64-musl": "1.0.1",
-    "typescript-types-mock-linux-arm-gnueabihf": "1.0.1"
+    "typescript-types-mock-win32-x64-msvc": "1.0.2",
+    "typescript-types-mock-darwin-x64": "1.0.2",
+    "typescript-types-mock-linux-x64-gnu": "1.0.2",
+    "typescript-types-mock-linux-x64-musl": "1.0.2",
+    "typescript-types-mock-linux-arm64-gnu": "1.0.2",
+    "typescript-types-mock-darwin-arm64": "1.0.2",
+    "typescript-types-mock-linux-arm64-musl": "1.0.2",
+    "typescript-types-mock-linux-arm-gnueabihf": "1.0.2"
   }
 }

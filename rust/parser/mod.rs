@@ -4,7 +4,7 @@
 pub mod swc_parser;
 pub mod ast_walker;
 
-use crate::types::{TypeNode, ResolvedTypes};
+use crate::types::TypeNode;
 
 /// Represents a parsed declaration from TypeScript source
 #[derive(Debug, Clone)]

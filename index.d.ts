@@ -16,7 +16,13 @@ export interface MockOptions {
   /** Whether to include optional properties (default: true) */
   includeOptional?: boolean
 }
-/** Test function to verify napi-rs setup */
-export declare function hello(): string
-/** Test function with parameters */
-export declare function add(a: number, b: number): number
+/** Parse a .ts file and generate a mock for the given type. */
+export declare function createMockFromFile(filePath: string, typeName: string, options?: MockOptions | undefined | null): any
+/** Parse a .ts file and generate multiple mocks. */
+export declare function createManyMocks(filePath: string, typeName: string, count: number, options?: MockOptions | undefined | null): Array<any>
+/** List all type names in a .ts file. */
+export declare function listTypes(filePath: string): Array<string>
+/** Parse TypeScript source code and generate a mock (no file needed). */
+export declare function mockFromSource(source: string, typeName: string, options?: MockOptions | undefined | null): any
+/** Get the native module version. */
+export declare function version(): string

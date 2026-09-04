@@ -224,6 +224,9 @@ if (!nativeBinding) {
 
 // Export functions explicitly
 module.exports = {
-  hello: nativeBinding.hello,
-  add: nativeBinding.add
+  createMockFromFile: nativeBinding.createMockFromFile,
+  createManyMocks: nativeBinding.createManyMocks,
+  listTypes: nativeBinding.listTypes,
+  mockFromSource: nativeBinding.mockFromSource,
+  version: nativeBinding.version,
 }

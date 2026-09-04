@@ -310,7 +310,10 @@ if (!nativeBinding) {
   throw new Error(`Failed to load native binding`)
 }
 
-const { hello, add } = nativeBinding
+const { createMockFromFile, createManyMocks, listTypes, mockFromSource, version } = nativeBinding
 
-module.exports.hello = hello
-module.exports.add = add
+module.exports.createMockFromFile = createMockFromFile
+module.exports.createManyMocks = createManyMocks
+module.exports.listTypes = listTypes
+module.exports.mockFromSource = mockFromSource
+module.exports.version = version

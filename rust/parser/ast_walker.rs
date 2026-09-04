@@ -2,7 +2,7 @@
 // Traverses SWC AST and converts it to our internal type representations
 
 use swc_ecma_ast::*;
-use swc_ecma_visit::{Visit, VisitWith};
+use swc_ecma_visit::Visit;
 
 use crate::types::{EnumMember, LiteralValue, PropertyNode, TypeNode};
 use super::{Declaration, ImportSpecifier};
