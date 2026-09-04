@@ -32,6 +32,7 @@ jobs:
           - host: macos-latest
             target: x86_64-apple-darwin
             build: |
+              rustup target add x86_64-apple-darwin
               npm run build -- --target x86_64-apple-darwin
               strip -x *.node
           - host: windows-latest
@@ -89,9 +90,8 @@ jobs:
             target: aarch64-unknown-linux-musl
             setup: |
               curl -fsSL https://musl.cc/aarch64-linux-musl-cross.tgz -o /tmp/aarch64-linux-musl-cross.tgz
-              sudo tar xf /tmp/aarch64-linux-musl-cross.tgz -C /opt/
-              sudo ln -sf /opt/aarch64-linux-musl-cross/bin/aarch64-linux-musl-gcc /usr/local/bin/
-              sudo ln -sf /opt/aarch64-linux-musl-cross/bin/aarch64-linux-musl-strip /usr/local/bin/
+              tar -xzf /tmp/aarch64-linux-musl-cross.tgz -C /tmp/
+              echo "/tmp/aarch64-linux-musl-cross/bin" >> $GITHUB_PATH
               mkdir -p .cargo
               printf '[target.aarch64-unknown-linux-musl]\nlinker = "aarch64-linux-musl-gcc"\n' > .cargo/config.toml
             build: |
