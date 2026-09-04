@@ -13,7 +13,6 @@
         "x86_64-unknown-linux-musl",
         "aarch64-unknown-linux-gnu",
         "aarch64-apple-darwin",
-        "aarch64-unknown-linux-musl",
         "armv7-unknown-linux-gnueabihf"
       ]
     }
@@ -94,7 +93,6 @@
     "typescript-types-mock-linux-x64-musl": "1.0.2",
     "typescript-types-mock-linux-arm64-gnu": "1.0.2",
     "typescript-types-mock-darwin-arm64": "1.0.2",
-    "typescript-types-mock-linux-arm64-musl": "1.0.2",
     "typescript-types-mock-linux-arm-gnueabihf": "1.0.2"
   }
 }
