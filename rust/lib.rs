@@ -18,7 +18,7 @@ pub use parser::{parse_file, parse_source, Declaration};
 /// Test function to verify napi-rs setup
 #[napi]
 pub fn hello() -> String {
-    "Hello from Rust! typescript-types-mock v1.0.0".to_string()
+    "Hello from Rust! typescript-types-mock v1.0.1".to_string()
 }
 
 /// Test function with parameters
