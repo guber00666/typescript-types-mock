@@ -45,12 +45,11 @@ jobs:
               strip *.node
           - host: ubuntu-latest
             target: x86_64-unknown-linux-musl
-            setup: |
-              sudo apt-get update -y
-              sudo apt-get install -y musl-tools
             build: |
               rustup target add x86_64-unknown-linux-musl
-              CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER=musl-gcc npm run build -- --target x86_64-unknown-linux-musl
+              CC="zig cc -target x86_64-linux-musl" \
+              CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER="zig cc -target x86_64-linux-musl" \
+              npm run build -- --target x86_64-unknown-linux-musl
               strip *.node
           - host: macos-latest
             target: aarch64-apple-darwin
@@ -86,14 +85,12 @@ jobs:
               arm-linux-gnueabihf-strip *.node
           - host: ubuntu-latest
             target: aarch64-unknown-linux-musl
-            setup: |
-              curl -fsSL https://musl.cc/aarch64-linux-musl-cross.tgz -o /tmp/aarch64-linux-musl-cross.tgz
-              tar -xzf /tmp/aarch64-linux-musl-cross.tgz -C /tmp/
-              echo "/tmp/aarch64-linux-musl-cross/bin" >> $GITHUB_PATH
             build: |
               rustup target add aarch64-unknown-linux-musl
-              CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER=aarch64-linux-musl-gcc npm run build -- --target aarch64-unknown-linux-musl
-              aarch64-linux-musl-strip *.node
+              CC="zig cc -target aarch64-linux-musl" \
+              CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER="zig cc -target aarch64-linux-musl" \
+              npm run build -- --target aarch64-unknown-linux-musl
+              aarch64-linux-musl-strip *.node 2>/dev/null || strip *.node 2>/dev/null || true
     name: stable - ${{ matrix.settings.target }} - node@20
     runs-on: ${{ matrix.settings.host }}
     steps:
@@ -115,6 +112,11 @@ jobs:
             .cargo-cache
             target/
           key: ${{ matrix.settings.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - name: Setup zig
+        uses: goto-bus-stop/setup-zig@v2
+        if: ${{ contains(matrix.settings.target, 'musl') }}
+        with:
+          version: 0.13.0
       - name: Setup toolchain
         run: ${{ matrix.settings.setup }}
         if: ${{ matrix.settings.setup }}
