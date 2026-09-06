@@ -4,6 +4,9 @@ use std::collections::HashMap;
 use crate::parser::Declaration;
 use crate::types::{PropertyNode, TypeNode, ResolvedTypes};
 
+/// Map of type name → type parameter names (for generics resolution)
+pub type TypeParamNames = HashMap<String, Vec<String>>;
+
 pub struct TypeResolver {
     declarations: Vec<Declaration>,
 }
@@ -45,6 +48,30 @@ impl TypeResolver {
 
     pub fn resolve_type(&self, type_name: &str) -> Option<TypeNode> {
         self.resolve_all().get(type_name).cloned()
+    }
+
+    /// Build a map of type name → type parameter names for generics resolution
+    pub fn resolve_type_params(&self) -> TypeParamNames {
+        let mut params = TypeParamNames::new();
+        for decl in &self.declarations {
+            match decl {
+                Declaration::Interface { name, type_parameter_names, .. } => {
+                    if !type_parameter_names.is_empty() {
+                        params.insert(name.clone(), type_parameter_names.clone());
+                    }
+                }
+                Declaration::TypeAlias { name, type_parameters, .. } => {
+                    if !type_parameters.is_empty() {
+                        params.insert(name.clone(), type_parameters.clone());
+                    }
+                }
+                Declaration::Class { name, .. } => {
+                    // Classes don't store type params in current parser, skip
+                }
+                _ => {}
+            }
+        }
+        params
     }
 
     fn merge_extends(resolved: &mut ResolvedTypes) {

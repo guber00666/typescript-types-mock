@@ -8,7 +8,14 @@
 // Or with ESM:
 //   import { MockContext, createMockContext } from 'typescript-types-mock/context';
 
-const { createMockFromFile, createManyMocks, listTypes: nativeListTypes } = require('./index.cjs');
+// Lazy-load native functions to avoid circular dependency with index.cjs
+let _native = null;
+function getNative() {
+  if (!_native) {
+    _native = require('./index.cjs');
+  }
+  return _native;
+}
 
 /**
  * MockContext — caches the file path and default options so you don't
@@ -48,7 +55,7 @@ class MockContext {
    * @returns {any} Mock object
    */
   mock(typeName, options = {}) {
-    return createMockFromFile(this._filePath, typeName, {
+    return getNative().createMockFromFile(this._filePath, typeName, {
       ...this._defaultOptions,
       ...options,
     });
@@ -68,7 +75,7 @@ class MockContext {
    * @returns {Array<any>} Array of mock objects
    */
   many(typeName, count, options = {}) {
-    return createManyMocks(this._filePath, typeName, count, {
+    return getNative().createManyMocks(this._filePath, typeName, count, {
       ...this._defaultOptions,
       ...options,
     });
@@ -85,7 +92,7 @@ class MockContext {
    * @returns {string[]} Array of type names
    */
   listTypes() {
-    return nativeListTypes(this._filePath);
+    return getNative().listTypes(this._filePath);
   }
 
   /**

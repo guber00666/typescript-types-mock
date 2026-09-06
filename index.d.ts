@@ -26,3 +26,62 @@ export declare function listTypes(filePath: string): Array<string>
 export declare function mockFromSource(source: string, typeName: string, options?: MockOptions | undefined | null): any
 /** Get the native module version. */
 export declare function version(): string
+
+// ─── Playwright helpers ────────────────────────────────────────
+export interface RouteResponseOptions {
+  status?: number;
+  headers?: Record<string, string>;
+  contentType?: string;
+}
+
+export interface ApiResponseOptions {
+  status?: number;
+  error?: string | null;
+  timestamp?: boolean;
+}
+
+export interface PaginatedResponseOptions {
+  page?: number;
+  pageSize?: number;
+  total?: number;
+  status?: number;
+}
+
+export interface RouteResponse {
+  status: number;
+  contentType: string;
+  headers: Record<string, string>;
+  body: string;
+}
+
+export interface ApiResponse<T = unknown> {
+  data: T;
+  error: string | null;
+  status: number;
+  timestamp: string;
+}
+
+export interface PaginatedResponse<T = unknown> {
+  data: T[];
+  meta: { page: number; pageSize: number; total: number; totalPages: number };
+  status: number;
+  timestamp: string;
+}
+
+export declare function createRouteResponse(body: unknown, options?: RouteResponseOptions): RouteResponse;
+export declare function createApiResponse<T = unknown>(data: T, options?: ApiResponseOptions): ApiResponse<T>;
+export declare function createPaginatedResponse<T = unknown>(items: T[], options?: PaginatedResponseOptions): PaginatedResponse<T>;
+
+// ─── MockContext ───────────────────────────────────────────────
+export declare class MockContext {
+  constructor(filePath: string, defaultOptions?: Omit<MockOptions, 'filePath'>);
+  readonly filePath: string;
+  mock(typeName: string, options?: Omit<MockOptions, 'filePath'>): any;
+  createMock(typeName: string, options?: Omit<MockOptions, 'filePath'>): any;
+  many(typeName: string, count: number, options?: Omit<MockOptions, 'filePath'>): any[];
+  createMany(typeName: string, count: number, options?: Omit<MockOptions, 'filePath'>): any[];
+  listTypes(): string[];
+  mockProperty(typeName: string, propertyPath: string, options?: Omit<MockOptions, 'filePath'>): any;
+}
+
+export declare function createMockContext(filePath: string, defaultOptions?: Omit<MockOptions, 'filePath'>): MockContext;

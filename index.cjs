@@ -222,11 +222,23 @@ if (!nativeBinding) {
   throw new Error(`Failed to load native binding`)
 }
 
-// Export functions explicitly
+// Load helpers and context (pure JS, no native dependency)
+const helpers = require('./helpers.cjs')
+const context = require('./context.cjs')
+
+// Export everything: native + helpers + context
 module.exports = {
+  // Native functions
   createMockFromFile: nativeBinding.createMockFromFile,
   createManyMocks: nativeBinding.createManyMocks,
   listTypes: nativeBinding.listTypes,
   mockFromSource: nativeBinding.mockFromSource,
   version: nativeBinding.version,
+  // Playwright helpers
+  createRouteResponse: helpers.createRouteResponse,
+  createApiResponse: helpers.createApiResponse,
+  createPaginatedResponse: helpers.createPaginatedResponse,
+  // Mock context
+  MockContext: context.MockContext,
+  createMockContext: context.createMockContext,
 }

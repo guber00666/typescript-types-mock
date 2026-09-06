@@ -83,21 +83,31 @@ fn parse_file_recursive(file_path: &str, visited: &mut Vec<String>) -> Result<Ve
     let base_dir = std::path::Path::new(file_path).parent()
         .unwrap_or_else(|| std::path::Path::new("."));
 
-    for (import_source, _specifiers) in &imports {
-        // Only follow relative imports (skip node_modules / bare specifiers)
-        if !import_source.starts_with('.') {
-            continue;
-        }
+    // Lazy-load tsconfig paths (only when a bare specifier is encountered)
+    let mut tsconfig_cache: Option<(std::path::PathBuf, Vec<(String, String)>)> = None;
 
-        let resolved_path = resolve_import_path(base_dir, import_source);
+    for (import_source, _specifiers) in &imports {
+        let resolved_path = if import_source.starts_with('.') {
+            resolve_import_path(base_dir, import_source)
+        } else {
+            // Try tsconfig paths for bare module specifiers
+            let (tsconfig_dir, aliases) = match &tsconfig_cache {
+                Some(cached) => cached,
+                None => {
+                    let info = load_tsconfig_paths(file_path);
+                    tsconfig_cache = Some(info);
+                    tsconfig_cache.as_ref().unwrap()
+                }
+            };
+            resolve_tsconfig_path(tsconfig_dir, aliases, import_source)
+        };
+
         if let Some(resolved) = resolved_path {
             match parse_file_recursive(&resolved, visited) {
                 Ok(mut imported_decls) => {
                     declarations.append(&mut imported_decls);
                 }
-                Err(_) => {
-                    // Silently skip unresolvable imports (e.g. barrel files, .js extensions)
-                }
+                Err(_) => {} // Silently skip unresolvable imports
             }
         }
     }
@@ -121,6 +131,94 @@ fn resolve_import_path(base_dir: &std::path::Path, import_source: &str) -> Optio
     for candidate in &candidates {
         if candidate.exists() {
             return Some(candidate.to_string_lossy().to_string());
+        }
+    }
+    None
+}
+
+/// Load tsconfig.json paths by walking up from the file's directory.
+/// Returns (tsconfig_dir, aliases as (prefix, replacement) pairs).
+fn load_tsconfig_paths(file_path: &str) -> (std::path::PathBuf, Vec<(String, String)>) {
+    let start_dir = std::path::Path::new(file_path).parent()
+        .unwrap_or_else(|| std::path::Path::new("."));
+    let start_dir = std::fs::canonicalize(start_dir).unwrap_or_else(|_| start_dir.to_path_buf());
+
+    let mut dir = start_dir.as_path();
+    loop {
+        let tsconfig = dir.join("tsconfig.json");
+        if tsconfig.exists() {
+            if let Ok(content) = std::fs::read_to_string(&tsconfig) {
+                if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
+                    let base_url = json["compilerOptions"]["baseUrl"].as_str().unwrap_or(".");
+                    let base_dir = dir.join(base_url);
+                    let mut aliases = Vec::new();
+                    if let Some(paths) = json["compilerOptions"]["paths"].as_object() {
+                        for (pattern, targets) in paths {
+                            if let Some(arr) = targets.as_array() {
+                                if let Some(first) = arr.first().and_then(|v| v.as_str()) {
+                                    if let Some(prefix) = pattern.strip_suffix("/*") {
+                                        let replacement = first.trim_end_matches("/*");
+                                        aliases.push((
+                                            format!("{}/", prefix),
+                                            base_dir.join(replacement).to_string_lossy().to_string(),
+                                        ));
+                                    } else {
+                                        aliases.push((
+                                            pattern.clone(),
+                                            base_dir.join(first).to_string_lossy().to_string(),
+                                        ));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    return (dir.to_path_buf(), aliases);
+                }
+            }
+            return (dir.to_path_buf(), Vec::new());
+        }
+        match dir.parent() {
+            Some(parent) => dir = parent,
+            None => break,
+        }
+    }
+    (start_dir, Vec::new())
+}
+
+/// Resolve a bare module specifier using tsconfig paths aliases.
+fn resolve_tsconfig_path(
+    _tsconfig_dir: &std::path::Path,
+    aliases: &[(String, String)],
+    import_source: &str,
+) -> Option<String> {
+    for (pattern_prefix, replacement_prefix) in aliases {
+        if let Some(rest) = import_source.strip_prefix(pattern_prefix.as_str()) {
+            let resolved = format!("{}/{}", replacement_prefix, rest);
+            let resolved_path = std::path::Path::new(&resolved);
+            let candidates = [
+                resolved_path.with_extension("ts"),
+                resolved_path.with_extension("tsx"),
+                resolved_path.join("index.ts"),
+                resolved_path.join("index.tsx"),
+            ];
+            for candidate in &candidates {
+                if candidate.exists() {
+                    return Some(candidate.to_string_lossy().to_string());
+                }
+            }
+        } else if import_source == pattern_prefix.trim_end_matches('/') {
+            let resolved_path = std::path::Path::new(replacement_prefix);
+            let candidates = [
+                resolved_path.with_extension("ts"),
+                resolved_path.with_extension("tsx"),
+                resolved_path.join("index.ts"),
+                resolved_path.join("index.tsx"),
+            ];
+            for candidate in &candidates {
+                if candidate.exists() {
+                    return Some(candidate.to_string_lossy().to_string());
+                }
+            }
         }
     }
     None

@@ -5,6 +5,7 @@ use serde_json::{json, Value, Map};
 use crate::types::{TypeNode, LiteralValue, PropertyNode, ResolvedTypes};
 use crate::types::options::MockOptions;
 use crate::random::RandomGenerator;
+use crate::resolver::TypeParamNames;
 
 pub struct MockGenerator {
     resolved: ResolvedTypes,
@@ -12,6 +13,7 @@ pub struct MockGenerator {
     rng: RandomGenerator,
     max_depth: u32,
     array_len: u32,
+    type_param_names: TypeParamNames,
 }
 
 impl MockGenerator {
@@ -19,7 +21,12 @@ impl MockGenerator {
         let rng = RandomGenerator::new(options.seed);
         let max_depth = options.effective_max_depth();
         let array_len = options.effective_array_length();
-        Self { resolved, options, rng, max_depth, array_len }
+        Self { resolved, options, rng, max_depth, array_len, type_param_names: HashMap::new() }
+    }
+
+    pub fn with_type_params(mut self, type_param_names: TypeParamNames) -> Self {
+        self.type_param_names = type_param_names;
+        self
     }
 
     /// Generate a mock for a named type
@@ -168,7 +175,7 @@ impl MockGenerator {
             return self.generate_value(sub_node, depth, subs, visited);
         }
         if let Some(resolved_node) = self.resolved.get(name).cloned() {
-            let new_subs = self.build_subs(&resolved_node, type_args);
+            let new_subs = self.build_subs(name, &resolved_node, type_args);
             let mut merged = subs.clone();
             merged.extend(new_subs);
             // Don't increment depth — TypeReference is a named alias, not real nesting
@@ -177,11 +184,23 @@ impl MockGenerator {
         json!(format!("<unresolved:{}>", name))
     }
 
-    fn build_subs(&self, node: &TypeNode, args: &[TypeNode]) -> HashMap<String, TypeNode> {
+    fn build_subs(&self, type_name: &str, node: &TypeNode, args: &[TypeNode]) -> HashMap<String, TypeNode> {
         let mut m = HashMap::new();
-        if let TypeNode::Interface { type_parameter_names, .. } = node {
-            for (i, pn) in type_parameter_names.iter().enumerate() {
-                if let Some(arg) = args.get(i) { m.insert(pn.clone(), arg.clone()); }
+        if args.is_empty() { return m; }
+
+        // Get parameter names: first from the node itself (Interface), then from type_param_names map
+        let param_names: Option<&Vec<String>> = match node {
+            TypeNode::Interface { type_parameter_names, .. } if !type_parameter_names.is_empty() => {
+                Some(type_parameter_names)
+            }
+            _ => self.type_param_names.get(type_name),
+        };
+
+        if let Some(names) = param_names {
+            for (i, pn) in names.iter().enumerate() {
+                if let Some(arg) = args.get(i) {
+                    m.insert(pn.clone(), arg.clone());
+                }
             }
         }
         m
