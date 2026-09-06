@@ -50,11 +50,13 @@ pub struct ImportSpecifier {
 
 /// Parse a TypeScript file and extract all declarations.
 /// Follows relative imports recursively to resolve cross-file type references.
+#[cfg(not(target_arch = "wasm32"))]
 pub fn parse_file(file_path: &str) -> Result<Vec<Declaration>, String> {
     let mut visited: Vec<String> = Vec::new();
     parse_file_recursive(file_path, &mut visited)
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn parse_file_recursive(file_path: &str, visited: &mut Vec<String>) -> Result<Vec<Declaration>, String> {
     // Normalize path to avoid revisiting the same file
     let canonical = std::fs::canonicalize(file_path)
@@ -116,6 +118,7 @@ fn parse_file_recursive(file_path: &str, visited: &mut Vec<String>) -> Result<Ve
 }
 
 /// Resolve an import specifier to a file path, trying common TypeScript extensions.
+#[cfg(not(target_arch = "wasm32"))]
 fn resolve_import_path(base_dir: &std::path::Path, import_source: &str) -> Option<String> {
     let joined = base_dir.join(import_source);
     let candidates = [
@@ -138,6 +141,7 @@ fn resolve_import_path(base_dir: &std::path::Path, import_source: &str) -> Optio
 
 /// Load tsconfig.json paths by walking up from the file's directory.
 /// Returns (tsconfig_dir, aliases as (prefix, replacement) pairs).
+#[cfg(not(target_arch = "wasm32"))]
 fn load_tsconfig_paths(file_path: &str) -> (std::path::PathBuf, Vec<(String, String)>) {
     let start_dir = std::path::Path::new(file_path).parent()
         .unwrap_or_else(|| std::path::Path::new("."));
@@ -186,6 +190,7 @@ fn load_tsconfig_paths(file_path: &str) -> (std::path::PathBuf, Vec<(String, Str
 }
 
 /// Resolve a bare module specifier using tsconfig paths aliases.
+#[cfg(not(target_arch = "wasm32"))]
 fn resolve_tsconfig_path(
     _tsconfig_dir: &std::path::Path,
     aliases: &[(String, String)],

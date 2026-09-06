@@ -17,6 +17,7 @@ pub struct MockContext {
 
 impl MockContext {
     /// Create a new context by parsing the given file.
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn new(file_path: &str, options: MockOptions) -> Result<Self, String> {
         let declarations = parser::parse_file(file_path)?;
         let resolver = TypeResolver::new(declarations);

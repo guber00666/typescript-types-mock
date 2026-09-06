@@ -1,12 +1,14 @@
 // Mock generation options
 // This module defines the options that can be passed to mock generation functions
 
+#[cfg(feature = "node")]
 use napi_derive::napi;
 use serde_json::Value;
 
 /// Options for mock generation
-#[napi(object)]
-#[derive(Debug, Clone)]
+#[cfg_attr(feature = "node", napi(object))]
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct MockOptions {
     /// Random seed for deterministic output
     pub seed: Option<i64>,

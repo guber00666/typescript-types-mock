@@ -27,9 +27,17 @@
   },
   "exports": {
     ".": {
+      "browser": {
+        "import": "./browser.mjs",
+        "types": "./browser.d.ts"
+      },
       "import": "./index.cjs",
       "require": "./index.cjs",
       "types": "./index.d.ts"
+    },
+    "./browser": {
+      "import": "./browser.mjs",
+      "types": "./browser.d.ts"
     },
     "./helpers": {
       "import": "./helpers.cjs",
@@ -45,15 +53,20 @@
   "files": [
     "index.cjs",
     "index.d.ts",
+    "browser.mjs",
+    "browser.d.ts",
     "helpers.cjs",
     "helpers.d.ts",
     "context.cjs",
     "context.d.ts",
+    "dist/wasm/*",
     "*.node"
   ],
   "scripts": {
     "artifacts": "napi create-npm-dir -t . && napi artifacts",
     "build": "napi build --platform --release",
+    "build:wasm": "cargo build --target wasm32-unknown-unknown --release --no-default-features --features wasm && wasm-bindgen target/wasm32-unknown-unknown/release/typescript_types_mock.wasm --out-dir dist/wasm --target web --no-typescript",
+    "build:all": "npm run build && npm run build:wasm",
     "build:debug": "napi build --platform",
     "prepublishOnly": "napi prepublish -t npm",
     "universal": "napi universal",
