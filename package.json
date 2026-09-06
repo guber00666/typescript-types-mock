@@ -1,6 +1,6 @@
 {
   "name": "typescript-types-mock",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Generate mock objects from TypeScript types for Playwright tests. Rust-powered, 10-50x faster than ts-morph.",
   "type": "module",
   "main": "./index.cjs",
@@ -30,11 +30,25 @@
       "import": "./index.cjs",
       "require": "./index.cjs",
       "types": "./index.d.ts"
+    },
+    "./helpers": {
+      "import": "./helpers.cjs",
+      "require": "./helpers.cjs",
+      "types": "./helpers.d.ts"
+    },
+    "./context": {
+      "import": "./context.cjs",
+      "require": "./context.cjs",
+      "types": "./context.d.ts"
     }
   },
   "files": [
     "index.cjs",
     "index.d.ts",
+    "helpers.cjs",
+    "helpers.d.ts",
+    "context.cjs",
+    "context.d.ts",
     "*.node"
   ],
   "scripts": {
