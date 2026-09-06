@@ -38,7 +38,7 @@
     "*.node"
   ],
   "scripts": {
-    "artifacts": "napi artifacts",
+    "artifacts": "napi create-npm-dir -t . && napi artifacts",
     "build": "napi build --platform --release",
     "build:debug": "napi build --platform",
     "prepublishOnly": "napi prepublish -t npm",
