@@ -73,12 +73,17 @@ fn parse_file_recursive(file_path: &str, visited: &mut Vec<String>) -> Result<Ve
 
     let mut declarations = swc_parser::parse_typescript(&source, file_path)?;
 
-    // Collect imports and resolve them
+    // Collect imports and re-exports and resolve them
     let imports: Vec<(String, Vec<ImportSpecifier>)> = declarations.iter().filter_map(|d| {
-        if let Declaration::Import { source, specifiers } = d {
-            Some((source.clone(), specifiers.clone()))
-        } else {
-            None
+        match d {
+            Declaration::Import { source, specifiers } => {
+                Some((source.clone(), specifiers.clone()))
+            }
+            Declaration::Export { source: Some(src), .. } => {
+                // Re-exports: export { X } from "./module"
+                Some((src.clone(), Vec::new()))
+            }
+            _ => None,
         }
     }).collect();
 
@@ -101,7 +106,9 @@ fn parse_file_recursive(file_path: &str, visited: &mut Vec<String>) -> Result<Ve
                     tsconfig_cache.as_ref().unwrap()
                 }
             };
-            resolve_tsconfig_path(tsconfig_dir, aliases, import_source)
+            let tsconfig_result = resolve_tsconfig_path(tsconfig_dir, aliases, import_source);
+            // Fallback: try resolving from node_modules (npm packages)
+            tsconfig_result.or_else(|| resolve_node_module_path(base_dir, import_source))
         };
 
         if let Some(resolved) = resolved_path {
@@ -124,9 +131,13 @@ fn resolve_import_path(base_dir: &std::path::Path, import_source: &str) -> Optio
     let candidates = [
         joined.with_extension("ts"),
         joined.with_extension("tsx"),
+        joined.with_extension("d.ts"),
+        joined.with_extension("d.tsx"),
         // Try as directory with index file
         joined.join("index.ts"),
         joined.join("index.tsx"),
+        joined.join("index.d.ts"),
+        joined.join("index.d.tsx"),
         // Already has extension
         joined.clone(),
     ];
@@ -187,6 +198,111 @@ fn load_tsconfig_paths(file_path: &str) -> (std::path::PathBuf, Vec<(String, Str
         }
     }
     (start_dir, Vec::new())
+}
+
+/// Resolve a bare module specifier by looking it up in `node_modules`.
+///
+/// For a specifier like `"axios"` or `"@types/node"`:
+/// 1. Walk up the directory tree from `base_dir` looking for `node_modules/<pkg>`
+/// 2. Read `package.json` to find the entry `.d.ts` file (`types`, `typings`, or `main`)
+/// 3. If a subpath is given (e.g. `"axios/lib/types"`), resolve it within the package
+#[cfg(not(target_arch = "wasm32"))]
+fn resolve_node_module_path(base_dir: &std::path::Path, import_source: &str) -> Option<String> {
+    // Split specifier into package name + optional subpath
+    let (pkg_name, subpath) = if import_source.starts_with('@') {
+        // Scoped package: "@scope/name" or "@scope/name/sub/path"
+        let mut parts = import_source.splitn(3, '/');
+        let scope = parts.next()?; // "@scope"
+        let name = parts.next()?; // "name"
+        let pkg = format!("{}/{}", scope, name);
+        let sub = parts.next().unwrap_or("");
+        (pkg, sub)
+    } else {
+        // Regular package: "axios" or "axios/lib/types"
+        let mut parts = import_source.splitn(2, '/');
+        let pkg = parts.next()?.to_string();
+        let sub = parts.next().unwrap_or("");
+        (pkg, sub)
+    };
+
+    // Walk up from base_dir looking for node_modules/<pkg_name>
+    let mut dir = Some(base_dir);
+    while let Some(current) = dir {
+        let pkg_dir = current.join("node_modules").join(&pkg_name);
+        if pkg_dir.is_dir() {
+            // If subpath given, resolve within the package
+            if !subpath.is_empty() {
+                let sub_resolved = pkg_dir.join(subpath);
+                let candidates = [
+                    sub_resolved.with_extension("d.ts"),
+                    sub_resolved.with_extension("d.tsx"),
+                    sub_resolved.join("index.d.ts"),
+                    sub_resolved.join("index.d.tsx"),
+                ];
+                for candidate in &candidates {
+                    if candidate.exists() {
+                        return Some(candidate.to_string_lossy().to_string());
+                    }
+                }
+                // Also try without adding extension (file might already have .d.ts)
+                if sub_resolved.exists() {
+                    return Some(sub_resolved.to_string_lossy().to_string());
+                }
+                continue;
+            }
+
+            // Read package.json to find types entry
+            let pkg_json_path = pkg_dir.join("package.json");
+            if let Ok(pkg_json_str) = std::fs::read_to_string(&pkg_json_path) {
+                if let Ok(pkg_json) = serde_json::from_str::<serde_json::Value>(&pkg_json_str) {
+                    // 1. Try "types" or "typings" field
+                    let types_field = pkg_json.get("types")
+                        .or_else(|| pkg_json.get("typings"))
+                        .and_then(|v| v.as_str());
+
+                    if let Some(types_path) = types_field {
+                        let types_file = pkg_dir.join(types_path);
+                        if types_file.exists() {
+                            return Some(types_file.to_string_lossy().to_string());
+                        }
+                    }
+
+                    // 2. Try "exports" -> "." -> "types" field (modern packages)
+                    let exports_types = pkg_json.get("exports")
+                        .and_then(|e| e.get("."))
+                        .and_then(|e| e.get("types"))
+                        .and_then(|v| v.as_str());
+
+                    if let Some(types_path) = exports_types {
+                        let types_file = pkg_dir.join(types_path);
+                        if types_file.exists() {
+                            return Some(types_file.to_string_lossy().to_string());
+                        }
+                    }
+
+                    // 3. Try "main" field, replacing .js with .d.ts
+                    let main_field = pkg_json.get("main")
+                        .and_then(|v| v.as_str());
+
+                    if let Some(main_path) = main_field {
+                        let main_file = pkg_dir.join(main_path);
+                        let dts_file = main_file.with_extension("d.ts");
+                        if dts_file.exists() {
+                            return Some(dts_file.to_string_lossy().to_string());
+                        }
+                    }
+                }
+            }
+
+            // 4. Fallback: try index.d.ts
+            let index_dts = pkg_dir.join("index.d.ts");
+            if index_dts.exists() {
+                return Some(index_dts.to_string_lossy().to_string());
+            }
+        }
+        dir = current.parent();
+    }
+    None
 }
 
 /// Resolve a bare module specifier using tsconfig paths aliases.
@@ -300,5 +416,42 @@ type StringOrNumber = string | number;
             }
             _ => panic!("Expected TypeAlias declaration"),
         }
+    }
+
+    #[test]
+    #[cfg(not(target_arch = "wasm32"))]
+    fn test_parse_file_with_node_modules() {
+        let fixture_path = "tests/fixtures/node-modules-test/consumer.ts";
+        let declarations = parse_file(fixture_path).unwrap();
+        
+        // Should have parsed MyData interface from consumer.ts
+        let my_data = declarations.iter().find(|d| {
+            if let Declaration::Interface { name, .. } = d {
+                name == "MyData"
+            } else {
+                false
+            }
+        });
+        assert!(my_data.is_some(), "MyData interface should be parsed");
+
+        // Should have parsed ExternalResponse from node_modules/fake-package
+        let external_response = declarations.iter().find(|d| {
+            if let Declaration::Interface { name, .. } = d {
+                name == "ExternalResponse"
+            } else {
+                false
+            }
+        });
+        assert!(external_response.is_some(), "ExternalResponse from node_modules should be parsed");
+
+        // Should have parsed Status type from node_modules/fake-package
+        let status = declarations.iter().find(|d| {
+            if let Declaration::TypeAlias { name, .. } = d {
+                name == "Status"
+            } else {
+                false
+            }
+        });
+        assert!(status.is_some(), "Status type from node_modules should be parsed");
     }
 }
