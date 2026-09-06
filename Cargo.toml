@@ -10,7 +10,7 @@ crate-type = ["cdylib"]
 [features]
 default = ["node"]
 node = ["napi", "napi-derive", "walkdir"]
-wasm = ["wasm-bindgen", "js-sys", "serde-wasm-bindgen", "getrandom/js"]
+wasm = ["wasm-bindgen", "js-sys", "getrandom/js"]
 
 [dependencies]
 serde = { version = "=1.0.210", features = ["derive"] }
@@ -23,7 +23,7 @@ napi-derive = { version = "2", optional = true }
 # WASM support
 wasm-bindgen = { version = "0.2", optional = true }
 js-sys = { version = "0.3", optional = true }
-serde-wasm-bindgen = { version = "0.6", optional = true }
+
 
 # TypeScript parsing (fastest TS parser)
 swc_common = { version = "0.36", default-features = false }

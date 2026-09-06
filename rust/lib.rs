@@ -96,12 +96,13 @@ use wasm_bindgen::prelude::*;
 
 #[cfg(feature = "wasm")]
 /// Parse TypeScript source and generate a mock for the given type.
+/// Returns a JSON string to avoid serde_wasm_bindgen enum serialization issues.
 #[wasm_bindgen]
 pub fn mock_from_source_wasm(
     source: &str,
     type_name: &str,
     options_json: &str,
-) -> Result<JsValue, JsValue> {
+) -> Result<String, JsValue> {
     let options: MockOptions = if options_json.is_empty() {
         MockOptions::default()
     } else {
@@ -112,19 +113,18 @@ pub fn mock_from_source_wasm(
         .map_err(|e| JsValue::from_str(&e))?;
     let result = ctx.mock(type_name, None)
         .map_err(|e| JsValue::from_str(&e))?;
-    serde_wasm_bindgen::to_value(&result)
-        .map_err(|e| JsValue::from_str(&format!("Serialization error: {}", e)))
+    Ok(result.to_string())
 }
 
 #[cfg(feature = "wasm")]
 /// Parse TypeScript source and list all available type names.
+/// Returns a JSON string.
 #[wasm_bindgen]
-pub fn list_types_wasm(source: &str) -> Result<JsValue, JsValue> {
+pub fn list_types_wasm(source: &str) -> Result<String, JsValue> {
     let ctx = MockContext::from_source(source, "input.ts", MockOptions::default())
         .map_err(|e| JsValue::from_str(&e))?;
     let types = ctx.list_types();
-    serde_wasm_bindgen::to_value(&types)
-        .map_err(|e| JsValue::from_str(&format!("Serialization error: {}", e)))
+    Ok(serde_json::to_string(&types).unwrap_or_else(|_| "[]".to_string()))
 }
 
 #[cfg(feature = "wasm")]

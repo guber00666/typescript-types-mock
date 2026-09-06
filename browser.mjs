@@ -36,7 +36,8 @@ function ensureInit() {
 export function mockFromSource(source, typeName, options) {
   ensureInit();
   const opts = options ? JSON.stringify(options) : '';
-  return mock_from_source_wasm(source, typeName, opts);
+  const jsonStr = mock_from_source_wasm(source, typeName, opts);
+  return JSON.parse(jsonStr);
 }
 
 /**
@@ -44,7 +45,7 @@ export function mockFromSource(source, typeName, options) {
  */
 export function listTypes(source) {
   ensureInit();
-  return list_types_wasm(source);
+  return JSON.parse(list_types_wasm(source));
 }
 
 /**
