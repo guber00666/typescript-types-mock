@@ -171,7 +171,8 @@ impl MockGenerator {
             let new_subs = self.build_subs(&resolved_node, type_args);
             let mut merged = subs.clone();
             merged.extend(new_subs);
-            return self.generate_value(&resolved_node, depth + 1, &merged, visited);
+            // Don't increment depth — TypeReference is a named alias, not real nesting
+            return self.generate_value(&resolved_node, depth, &merged, visited);
         }
         json!(format!("<unresolved:{}>", name))
     }

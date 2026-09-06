@@ -48,12 +48,82 @@ pub struct ImportSpecifier {
     pub local: String,
 }
 
-/// Parse a TypeScript file and extract all declarations
+/// Parse a TypeScript file and extract all declarations.
+/// Follows relative imports recursively to resolve cross-file type references.
 pub fn parse_file(file_path: &str) -> Result<Vec<Declaration>, String> {
+    let mut visited: Vec<String> = Vec::new();
+    parse_file_recursive(file_path, &mut visited)
+}
+
+fn parse_file_recursive(file_path: &str, visited: &mut Vec<String>) -> Result<Vec<Declaration>, String> {
+    // Normalize path to avoid revisiting the same file
+    let canonical = std::fs::canonicalize(file_path)
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_else(|_| file_path.to_string());
+
+    if visited.contains(&canonical) {
+        return Ok(Vec::new()); // Already parsed — skip (handles circular imports)
+    }
+    visited.push(canonical);
+
     let source = std::fs::read_to_string(file_path)
         .map_err(|e| format!("Failed to read file {}: {}", file_path, e))?;
 
-    swc_parser::parse_typescript(&source, file_path)
+    let mut declarations = swc_parser::parse_typescript(&source, file_path)?;
+
+    // Collect imports and resolve them
+    let imports: Vec<(String, Vec<ImportSpecifier>)> = declarations.iter().filter_map(|d| {
+        if let Declaration::Import { source, specifiers } = d {
+            Some((source.clone(), specifiers.clone()))
+        } else {
+            None
+        }
+    }).collect();
+
+    let base_dir = std::path::Path::new(file_path).parent()
+        .unwrap_or_else(|| std::path::Path::new("."));
+
+    for (import_source, _specifiers) in &imports {
+        // Only follow relative imports (skip node_modules / bare specifiers)
+        if !import_source.starts_with('.') {
+            continue;
+        }
+
+        let resolved_path = resolve_import_path(base_dir, import_source);
+        if let Some(resolved) = resolved_path {
+            match parse_file_recursive(&resolved, visited) {
+                Ok(mut imported_decls) => {
+                    declarations.append(&mut imported_decls);
+                }
+                Err(_) => {
+                    // Silently skip unresolvable imports (e.g. barrel files, .js extensions)
+                }
+            }
+        }
+    }
+
+    Ok(declarations)
+}
+
+/// Resolve an import specifier to a file path, trying common TypeScript extensions.
+fn resolve_import_path(base_dir: &std::path::Path, import_source: &str) -> Option<String> {
+    let joined = base_dir.join(import_source);
+    let candidates = [
+        joined.with_extension("ts"),
+        joined.with_extension("tsx"),
+        // Try as directory with index file
+        joined.join("index.ts"),
+        joined.join("index.tsx"),
+        // Already has extension
+        joined.clone(),
+    ];
+
+    for candidate in &candidates {
+        if candidate.exists() {
+            return Some(candidate.to_string_lossy().to_string());
+        }
+    }
+    None
 }
 
 /// Parse TypeScript source code directly
