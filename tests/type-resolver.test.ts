@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { TypeResolver } from "../src/core/type-resolver.js";
 import { TypeKind } from "../src/types/index.js";
 import path from "path";
