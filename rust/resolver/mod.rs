@@ -65,7 +65,7 @@ impl TypeResolver {
                         params.insert(name.clone(), type_parameters.clone());
                     }
                 }
-                Declaration::Class { name, .. } => {
+                Declaration::Class { .. } => {
                     // Classes don't store type params in current parser, skip
                 }
                 _ => {}

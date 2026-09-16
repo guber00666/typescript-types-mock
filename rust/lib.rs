@@ -25,6 +25,7 @@ pub use resolver::TypeResolver;
 pub use generator::MockGenerator;
 pub use context::MockContext;
 
+#[cfg(feature = "node")]
 use serde_json::Value;
 use types::options::MockOptions;
 

@@ -6,8 +6,7 @@ env:
   MACOSX_DEPLOYMENT_TARGET: '10.13'
 
 permissions:
-  contents: write
-  id-token: write
+  contents: read
 
 on:
   push:
@@ -94,7 +93,7 @@ jobs:
           node-version: 20
           cache: npm
       - name: Install dependencies
-        run: npm install
+        run: npm ci
       - name: Cache cargo
         uses: actions/cache@v4
         with:
@@ -146,7 +145,7 @@ jobs:
           node-version: ${{ matrix.node }}
           cache: npm
       - name: Install dependencies
-        run: npm install
+        run: npm ci
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
@@ -179,7 +178,7 @@ jobs:
         run: apk add --no-cache git
       - uses: actions/checkout@v4
       - name: Install dependencies
-        run: npm install
+        run: npm ci
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
@@ -208,7 +207,7 @@ jobs:
       - name: Install wasm-bindgen-cli
         run: cargo install wasm-bindgen-cli --version 0.2.127
       - name: Install dependencies
-        run: npm install
+        run: npm ci
       - name: Build WASM
         run: |
           cargo build --target wasm32-unknown-unknown --release --no-default-features --features wasm --locked
@@ -225,6 +224,10 @@ jobs:
   publish:
     name: Publish
     runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
+      id-token: write
     needs:
       - test-linux-x64-gnu-binding
       - test-linux-x64-musl-binding
@@ -237,7 +240,7 @@ jobs:
           node-version: 20
           cache: npm
       - name: Install dependencies
-        run: npm install
+        run: npm ci
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:

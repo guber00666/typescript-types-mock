@@ -214,21 +214,6 @@ pub fn address(rng: &mut RandomGenerator) -> String {
     format!("{} {} St", number, street)
 }
 
-/// Generate city name
-pub fn city(rng: &mut RandomGenerator) -> String {
-    rng.pick(CITIES).to_string()
-}
-
-/// Generate country name
-pub fn country(rng: &mut RandomGenerator) -> String {
-    rng.pick(COUNTRIES).to_string()
-}
-
-/// Generate color hex code
-pub fn color(rng: &mut RandomGenerator) -> String {
-    rng.pick(COLORS).to_string()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
