@@ -112,7 +112,7 @@ impl Visit for TypeExtractor {
             .map(|member| {
                 let member_name = match &member.id {
                     TsEnumMemberId::Ident(id) => id.sym.to_string(),
-                    TsEnumMemberId::Str(s) => s.value.to_string(),
+                    TsEnumMemberId::Str(s) => s.value.to_string_lossy().into_owned(),
                 };
 
                 let value = if let Some(init) = &member.init {
@@ -177,7 +177,7 @@ impl Visit for TypeExtractor {
 
     // Visit import declarations
     fn visit_import_decl(&mut self, decl: &ImportDecl) {
-        let source = decl.src.value.to_string();
+        let source = decl.src.value.to_string_lossy().into_owned();
 
         let specifiers = decl
             .specifiers
@@ -190,7 +190,7 @@ impl Visit for TypeExtractor {
                             .as_ref()
                             .map(|i| match i {
                                 ModuleExportName::Ident(id) => id.sym.to_string(),
-                                ModuleExportName::Str(s) => s.value.to_string(),
+                                ModuleExportName::Str(s) => s.value.to_string_lossy().into_owned(),
                             })
                             .unwrap_or_else(|| named.local.sym.to_string());
 
@@ -223,7 +223,7 @@ impl Visit for TypeExtractor {
                 if let ExportSpecifier::Named(named) = spec {
                     match &named.orig {
                         ModuleExportName::Ident(id) => Some(id.sym.to_string()),
-                        ModuleExportName::Str(s) => Some(s.value.to_string()),
+                        ModuleExportName::Str(s) => Some(s.value.to_string_lossy().into_owned()),
                     }
                 } else {
                     None
@@ -231,7 +231,7 @@ impl Visit for TypeExtractor {
             })
             .collect();
 
-        let source = decl.src.as_ref().map(|s| s.value.to_string());
+        let source = decl.src.as_ref().map(|s| s.value.to_string_lossy().into_owned());
 
         self.declarations.push(Declaration::Export { names, source });
     }
@@ -242,7 +242,7 @@ impl Visit for TypeExtractor {
 fn convert_property_signature(prop: &TsPropertySignature) -> Option<PropertyNode> {
     let name = match &*prop.key {
         Expr::Ident(id) => id.sym.to_string(),
-        Expr::Lit(Lit::Str(s)) => s.value.to_string(),
+        Expr::Lit(Lit::Str(s)) => s.value.to_string_lossy().into_owned(),
         _ => return None,
     };
 
@@ -263,7 +263,7 @@ fn convert_property_signature(prop: &TsPropertySignature) -> Option<PropertyNode
 fn convert_class_property(prop: &ClassProp) -> Option<PropertyNode> {
     let name = match &prop.key {
         PropName::Ident(id) => id.sym.to_string(),
-        PropName::Str(s) => s.value.to_string(),
+        PropName::Str(s) => s.value.to_string_lossy().into_owned(),
         _ => return None,
     };
 
@@ -281,7 +281,19 @@ fn convert_class_property(prop: &ClassProp) -> Option<PropertyNode> {
     })
 }
 
+/// Maximum nesting depth allowed when converting SWC types.
+/// Guards against stack overflow on pathologically deeply nested types
+/// (e.g. thousands of nested `Array<...>`); deeper levels convert to `Any`.
+const MAX_TYPE_DEPTH: u32 = 128;
+
 fn convert_type_ann(type_ann: &TsType) -> TypeNode {
+    convert_type_ann_depth(type_ann, 0)
+}
+
+fn convert_type_ann_depth(type_ann: &TsType, depth: u32) -> TypeNode {
+    if depth >= MAX_TYPE_DEPTH {
+        return TypeNode::Any;
+    }
     match type_ann {
         TsType::TsKeywordType(kw) => match kw.kind {
             TsKeywordTypeKind::TsStringKeyword => TypeNode::String,
@@ -299,35 +311,35 @@ fn convert_type_ann(type_ann: &TsType) -> TypeNode {
             TsKeywordTypeKind::TsIntrinsicKeyword => TypeNode::Any,
         },
 
-        TsType::TsTypeRef(type_ref) => convert_type_reference(type_ref),
+        TsType::TsTypeRef(type_ref) => convert_type_reference(type_ref, depth),
 
         TsType::TsArrayType(arr) => TypeNode::Array {
-            element_type: Box::new(convert_type_ann(&arr.elem_type)),
+            element_type: Box::new(convert_type_ann_depth(&arr.elem_type, depth + 1)),
         },
 
         TsType::TsTupleType(tuple) => {
             let elements = tuple
                 .elem_types
                 .iter()
-                .map(|elem| convert_type_ann(&elem.ty))
+                .map(|elem| convert_type_ann_depth(&elem.ty, depth + 1))
                 .collect();
             TypeNode::Tuple { elements }
         }
 
         TsType::TsUnionOrIntersectionType(ui) => match ui {
             TsUnionOrIntersectionType::TsUnionType(union) => {
-                let types = union.types.iter().map(|t| convert_type_ann(t)).collect();
+                let types = union.types.iter().map(|t| convert_type_ann_depth(t, depth + 1)).collect();
                 TypeNode::Union { types }
             }
             TsUnionOrIntersectionType::TsIntersectionType(intersection) => {
-                let types = intersection.types.iter().map(|t| convert_type_ann(t)).collect();
+                let types = intersection.types.iter().map(|t| convert_type_ann_depth(t, depth + 1)).collect();
                 TypeNode::Intersection { types }
             }
         },
 
         TsType::TsLitType(lit) => {
             let value = match &lit.lit {
-                TsLit::Str(s) => LiteralValue::String(s.value.to_string()),
+                TsLit::Str(s) => LiteralValue::String(s.value.to_string_lossy().into_owned()),
                 TsLit::Number(n) => LiteralValue::Number(n.value),
                 TsLit::Bool(b) => LiteralValue::Boolean(b.value),
                 TsLit::BigInt(bi) => {
@@ -362,21 +374,21 @@ fn convert_type_ann(type_ann: &TsType) -> TypeNode {
         TsType::TsMappedType(_) => TypeNode::Any, // Mapped types
         TsType::TsConditionalType(_) => TypeNode::Any,
         TsType::TsInferType(_) => TypeNode::Any,
-        TsType::TsParenthesizedType(paren) => convert_type_ann(&paren.type_ann),
+        TsType::TsParenthesizedType(paren) => convert_type_ann_depth(&paren.type_ann, depth + 1),
         TsType::TsOptionalType(opt) => TypeNode::Optional {
-            inner_type: Box::new(convert_type_ann(&opt.type_ann)),
+            inner_type: Box::new(convert_type_ann_depth(&opt.type_ann, depth + 1)),
         },
         TsType::TsRestType(rest) => TypeNode::Array {
-            element_type: Box::new(convert_type_ann(&rest.type_ann)),
+            element_type: Box::new(convert_type_ann_depth(&rest.type_ann, depth + 1)),
         },
-        TsType::TsTypeOperator(op) => convert_type_ann(&op.type_ann),
+        TsType::TsTypeOperator(op) => convert_type_ann_depth(&op.type_ann, depth + 1),
         TsType::TsIndexedAccessType(_) => TypeNode::Any,
         TsType::TsImportType(_) => TypeNode::Any,
         TsType::TsTypePredicate(_) => TypeNode::Boolean, // Type predicates like "x is string"
     }
 }
 
-fn convert_type_reference(type_ref: &TsTypeRef) -> TypeNode {
+fn convert_type_reference(type_ref: &TsTypeRef, depth: u32) -> TypeNode {
     let name = match &type_ref.type_name {
         TsEntityName::Ident(id) => id.sym.to_string(),
         TsEntityName::TsQualifiedName(qn) => {
@@ -405,7 +417,7 @@ fn convert_type_reference(type_ref: &TsTypeRef) -> TypeNode {
         type_params
             .params
             .iter()
-            .map(|p| convert_type_ann(p))
+            .map(|p| convert_type_ann_depth(p, depth + 1))
             .collect()
     } else {
         vec![]
@@ -514,7 +526,7 @@ fn convert_type_reference(type_ref: &TsTypeRef) -> TypeNode {
 fn convert_expr_to_literal(expr: &Expr) -> LiteralValue {
     match expr {
         Expr::Lit(lit) => match lit {
-            Lit::Str(s) => LiteralValue::String(s.value.to_string()),
+            Lit::Str(s) => LiteralValue::String(s.value.to_string_lossy().into_owned()),
             Lit::Num(n) => LiteralValue::Number(n.value),
             Lit::Bool(b) => LiteralValue::Boolean(b.value),
             _ => LiteralValue::String("".to_string()),
@@ -527,5 +539,61 @@ fn convert_expr_to_literal(expr: &Expr) -> LiteralValue {
             }
         }
         _ => LiteralValue::String("".to_string()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use swc_common::DUMMY_SP;
+
+    /// Build a `TsType` of nested arrays: `number[][][]...` (depth levels).
+    fn nested_array(depth: usize) -> TsType {
+        let mut t = TsType::TsKeywordType(TsKeywordType {
+            span: DUMMY_SP,
+            kind: TsKeywordTypeKind::TsNumberKeyword,
+        });
+        for _ in 0..depth {
+            t = TsType::TsArrayType(TsArrayType {
+                span: DUMMY_SP,
+                elem_type: Box::new(t),
+            });
+        }
+        t
+    }
+
+    fn count_array_levels(node: &TypeNode) -> (usize, bool, bool) {
+        let mut cur = node;
+        let mut levels = 0;
+        while let TypeNode::Array { element_type } = cur {
+            cur = element_type;
+            levels += 1;
+        }
+        (
+            levels,
+            matches!(cur, TypeNode::Any),
+            matches!(cur, TypeNode::Number),
+        )
+    }
+
+    #[test]
+    fn deep_nesting_is_capped_without_stack_overflow() {
+        // Far deeper than MAX_TYPE_DEPTH: must not crash the process
+        let deep = nested_array(MAX_TYPE_DEPTH as usize * 8);
+        let node = convert_type_ann(&deep);
+
+        let (levels, ends_with_any, _) = count_array_levels(&node);
+        assert!(ends_with_any, "conversion must bottom out at Any");
+        assert_eq!(levels, MAX_TYPE_DEPTH as usize);
+    }
+
+    #[test]
+    fn shallow_nesting_is_unaffected() {
+        let shallow = nested_array(5);
+        let node = convert_type_ann(&shallow);
+
+        let (levels, _, ends_with_number) = count_array_levels(&node);
+        assert_eq!(levels, 5);
+        assert!(ends_with_number);
     }
 }
